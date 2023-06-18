@@ -119,7 +119,14 @@ est_des  <- skim(tabla_limpia)
 stargazer(est_des, type = "text", omit.stat = c("ser", "f", "adj.rsq")) #SALE VACIA
 stargazer(tabla_limpia, type = "latex", summary = T, omit.stat = c("ser", "f", "adj.rsq")) #SALE VACIA
 
-str(sum)
+#Regresión : log(wage) = b1 + b2(age) + b3(age)^2 + u
+tabla_limpia$age2 <- tabla_limpia$age^2
+reg1 <- lm(log(ingtot)  ~ age + age2, tabla_limpia)
+
+?lm
+
+reg1 <- lm(log(tabla_limpia$ingtot)  ~ tabla_limpia$age + tabla_limpia$age2)
+summary(reg1)
 
 
 #Loop (No está funcionando)
