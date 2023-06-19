@@ -6,6 +6,19 @@ library(dplyr)
 p_load(rvest, tidyverse, ggplot2, rio, skimr, caret)
 
 
+## Realizar un loop para adjuntar los archivos de la base de datos GEIH
+
+
+GEIH_BOG18 <- data.frame()
+
+for (i in 1:10) {
+  url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html")
+  data_chunk <- read_html(url)
+  tabla <- data_chunk %>%
+    html_table()
+  GEIH_BOG18 <- bind_rows(tabla,GEIH_BOG18) 
+}
+
 #Bind Manual
 url1 <- "https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html"
 browseURL(url1)
@@ -142,6 +155,8 @@ db<-do.call(rbind,db_list) #une todo en un data.frame
 
 ## Mi intento
 
+
+
 tabla_loop <-  data.frame()
 for (PS1 in seq(from = 1, to = 10, by = 1)){
   url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",PS1,".html")
@@ -153,3 +168,4 @@ tabla_loop =  rbind(tabla_loop, data.frame())
 print(paste("Data_Chunk:",PS1))
 
 view(tabla_loop)
+view(GEIH_BOG18)
