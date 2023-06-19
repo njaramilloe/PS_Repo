@@ -129,7 +129,7 @@ reg1 <- lm(log(tabla_limpia$ingtot)  ~ tabla_limpia$age + tabla_limpia$age2)
 summary(reg1)
 
 
-#Loop (No está funcionando)
+#Loop (REVISAR)
 readHTML<-function(page_numb){
   x<-read_html(paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",page_numb,".html")) 
   #Faltan Pasos para obtener la tabla (completar ustedes)
