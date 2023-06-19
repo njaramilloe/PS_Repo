@@ -129,7 +129,8 @@ reg1 <- lm(log(tabla_limpia$ingtot)  ~ tabla_limpia$age + tabla_limpia$age2)
 summary(reg1)
 
 
-#Loop (REVISAR)
+#Loop (REVISAR) 
+## Lo que Ignacio nos envió
 readHTML<-function(page_numb){
   x<-read_html(paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",page_numb,".html")) 
   #Faltan Pasos para obtener la tabla (completar ustedes)
@@ -139,8 +140,16 @@ readHTML<-function(page_numb){
 db_list<-lapply(1:10,readHTML)  #itera sobre las páginas y retorna una lista con 10 elementos
 db<-do.call(rbind,db_list) #une todo en un data.frame
 
-tabla_loop <-
+## Mi intento
+
+tabla_loop <-  data.frame()
 for (PS1 in seq(from = 1, to = 10, by = 1)){
   url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",PS1,".html")
   total_data <- read_html(url)
 }
+
+tabla_loop =  rbind(tabla_loop, data.frame())
+
+print(paste("Data_Chunk:",PS1))
+
+view(tabla_loop)
