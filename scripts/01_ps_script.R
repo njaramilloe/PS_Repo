@@ -6,18 +6,26 @@ library(dplyr)
 p_load(rvest, tidyverse, ggplot2, rio, skimr, caret)
 
 
-## Realizar un loop para adjuntar los archivos de la base de datos GEIH
+# PASO 1: CARGAR LOS DATOS ---------------------------------------------------- 
 
+# Realizar un loop para adjuntar los 10 archivos en los cuales se encuentra 
+# divida la base de datos GEIH de Bogotá 2018"
 
-GEIH_BOG18 <- data.frame()
+geih_bog18 <- data.frame()
 
 for (i in 1:10) {
-  url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html")
-  data_chunk <- read_html(url)
-  tabla <- data_chunk %>%
-    html_table()
-  GEIH_BOG18 <- bind_rows(tabla,GEIH_BOG18) 
+   url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",i,".html")
+   data_chunk <- read_html(url)
+   tabla <- data_chunk %>%
+     html_table()
+   geih_bog18 <- bind_rows(tabla, geih_bog18)
+   print("BD", i)
 }
+
+## Mantener la memoria limpia en caso de requerir capacidad para el procesamiento de datos
+rm(list = "url", i, "tabla", data_chunk)
+
+
 
 #Bind Manual
 url1 <- "https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html"
@@ -114,8 +122,6 @@ data_chunk_10
 
 tabla_10 <- data_chunk_10 %>%
   html_table() %>% .[[1]]
-
-
 
 tabla <- bind_rows(bind_rows(bind_rows(bind_rows(bind_rows(bind_rows(bind_rows(bind_rows(tabla_1, tabla_2), tabla_3), tabla_5), tabla_6), tabla_7), tabla_8), tabla_9), tabla_10)
 
