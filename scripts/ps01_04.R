@@ -14,7 +14,7 @@ rm(list = ls())
 library(pacman)
 library(ggplot2) #estos son necesarios si ya estan en el p_load? 
 library(dplyr)
-p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, rstudioapi)
+p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, rstudioapi, stargazer)
 
 # 0.3 Define directories
 path_script <- rstudioapi::getActiveDocumentContext()$path
@@ -47,36 +47,48 @@ str(genddata)
 #Understand whether variables classes are numerical or categorical
 skim(genddata)
 
-# 2. Estimate the unconditional wage gap----------------------------------------
+# 2. Estimate the unconditional wage gap (4A) ----------------------------------
 #' In this section, we estimate the unconditional wage gap, which is 
 #' log(w) = β1 + β2Female + u , where Female is an indicator that takes the value
 #' of one if the individual in the sample identifies as female.
 
   #Simulando 01_ps_script
-      reg4<- lm(log(genddata$ingtot)  ~ genddata$female, genddata)
+      reg4<- lm(log(genddata$ingtot)  ~ genddata$sex, genddata)
       summary(reg4)
       
   #Simulando Cuaderno del Modulo 2
       
     # 2.1 We first select the variables used in the analysis (X)
-      gen1.explanatory = c('female')
+      gen1.explanatory = c('sex')
       x <- genddata %>% select(gen1.explanatory)
       
     # 2.2 We then select the dependent variable
       y <- select(ingtot) %>%
-            mutate() %>%
+        y$ingtot <- log(y$ingtot) %>%
             rename(y=ingtot)
     
-    # 2.3 Next, we construct the database and check variables classes
+    # 2.3 Next, we construct the database, check variables types and see the 
+      #'correlation between variables in order to decide the correct estimation
+      #'procedure.
       dat = cbind(x, y)
       skim(dat)
-     
-    # 2.4 
+      corr_matrix <- corr(dat)
+      print(corr_matrix)
+      
+    # 2.4 Estimate the linear regression
       reg4 <- lm(y ~ ., data = dat, x = TRUE)
       summary(reg4)
 #para que sirve x=TRUE
       
+    #2.5 Export results *Revisar si funciona
+      stargazer(reg4,type="text",digits=3)
       
+# 3. Estimate the conditional wage gap (4B) ------------------------------------
+#' In this section, we will estimate the conditional wage gap which we have 
+#' defined as log(w) = β1 + β2Female + β3 + β4 + β5 u , where 
+        #' Female is an indicator that takes the value of one if the individual 
+        #' in the sample identifies as female.
+        #'
+        #'
 
-
-
+      
