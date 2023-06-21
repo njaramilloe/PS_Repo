@@ -3,7 +3,7 @@ rm(list = ls())
 library(pacman)
 library(ggplot2)
 library(dplyr)
-p_load(rvest, tidyverse, ggplot2, rio, skimr, caret)
+p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, stargazer)
 
 
 # PASO 1: CARGAR LOS DATOS ---------------------------------------------------- 
@@ -21,14 +21,110 @@ for (i in 1:10) {
    geih_bog18 <- bind_rows(tabla, geih_bog18)
    print("BD", i)
 }
-geihbog18<-  geih_bog18 %>% filter(age > 17)
+geihbog18<-geih_bog18 %>% filter(age > 17)
+
+view(geihbog18)
+
+str(geihbog18)
 
 ## Mantener la memoria limpia en caso de requerir capacidad para el procesamiento de datos
 rm(list = "url", i, "tabla", data_chunk)
 
+#ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
+# Keep a couple  of predictors and look at  statistics
+geihbog18_selected <- geihbog18  %>% select(ingtot, 
+                        age,
+                        sex,
+                        oficio,
+                        relab,
+                        college,
+                        ocu,
+                        p6210s1)
+
+#Descriptive statistics
+summary_table <- stargazer(data.frame(geihbog18_selected), header=FALSE, type='text',title="Variables Included in the Selected Data Set")
+
+#Export descriptive analysis of selected variables in latex
+write(summary_table, file = "summary_table.tex")
+
+#Export descriptive analysis of selected variable in word
+##Create a Word document using the read_docx() function from the officer package
+doc <- read_docx()
+
+##Add the table to the Word document using the body_add_flextable() function
+flextable <- flextable(as.data.frame(summary_table))
+doc <- body_add_flextable(doc, flextable)
+
+##Save the Word document
+print(doc, target = "summary_table.docx")
 
 
-#Bind Manual
+#REVISAR POR MISSING VALUES ----------------------------------------------------
+missing_values <- is.na(geihbog18_selected)
+
+#Eliminar missings de la columna de la y
+geihbog18_clean <- na.omit(geihbog18_selected, cols="ingtot")
+
+
+#REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
+##Create the age square variable 
+geihbog18_clean <- geihbog18_clean  %>% mutate(age2=age^2)
+
+#Regress
+reg_age <- lm(log(ingtot) ~ age + age2, geihbog18_clean) #No corre por el siguiente error:
+
+#Error in lm.fit(x, y, offset = offset, singular.ok = singular.ok, ...) : NA/NaN/Inf in 'y'
+#pero ya limpiamos los missings de la variable y. Cómo podemos solucionar?
+
+stargazer(reg_age,type="text",omit.stat = c("ser", "f", "adj.rsq"))
+
+#Bootstrap to construct the confidence intervals
+p_load("boot")
+
+#Define a function that will extract the coefficients from the model based on bootstrap samples
+get_coefficients <- function(geihbog18_clean, indices) {
+  fit <- lm(log(ingtot) ~ age + age2, data = geihbog18_clean[indices, ])
+  return(coef(fit))
+}
+
+#Use the boot function to perform the bootstrap procedure and calculate the confidence intervals
+##Set stype = "i" to obtain the percentile intervals
+boot_results <- boot(data = geihbog18_clean, statistic = get_coefficients, R = 1000)
+confidence_intervals <- boot.ci(boot_results, type = "perc")
+
+#Obtain the confidence intervals
+confidence_intervals_95 <- confidence_intervals$percent[, 4]
+
+#Plot of the estimated age-earnings profile
+geihbog18_clean <- geihbog18_clean  %>% mutate(yhat=predict(reg_age))
+
+summ = geihbog18_clean %>%  
+  group_by(
+    age, age2
+  ) %>%  
+  summarize(
+    mean_y = mean(ingtot),
+    yhat_reg = mean(yhat), .groups="drop"
+  ) 
+
+
+ggplot(summ) + 
+  geom_line(
+    aes(x = afqt, y = yhat_reg), 
+    color = "green", size = 1.5
+  ) + 
+  labs(
+    title = "log Wages by Age in the GEIH 2018",
+    x = "Age",
+    y = "log Wages"
+  ) +
+  theme_bw()
+
+
+
+
+
+#ALTERNATIVA: Bind Manual ---------------------------------------------------- 
 url1 <- "https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_1.html"
 browseURL(url1)
 
@@ -129,50 +225,3 @@ tabla <- bind_rows(bind_rows(bind_rows(bind_rows(bind_rows(bind_rows(bind_rows(b
 #Filtrar por edad
 tabla_limpia <-  tabla %>% filter(age > 17)
 
-#Estadísticas descriptivas
-p_load(stargazer)
-
-sum <- summary(tabla_limpia)
-stargazer(sum, type = "text", omit.stat = c("ser", "f", "adj.rsq")) #NO FUNCIONOA
-
-est_des  <- skim(tabla_limpia)
-stargazer(est_des, type = "text", omit.stat = c("ser", "f", "adj.rsq")) #SALE VACIA
-stargazer(tabla_limpia, type = "latex", summary = T, omit.stat = c("ser", "f", "adj.rsq")) #SALE VACIA
-
-#Regresión : log(wage) = b1 + b2(age) + b3(age)^2 + u
-tabla_limpia$age2 <- tabla_limpia$age^2
-reg1 <- lm(log(ingtot)  ~ age + age2, tabla_limpia)
-
-?lm
-
-reg1 <- lm(log(tabla_limpia$ingtot)  ~ tabla_limpia$age + tabla_limpia$age2)
-summary(reg1)
-
-
-#Loop (REVISAR) 
-## Lo que Ignacio nos envió
-readHTML<-function(page_numb){
-  x<-read_html(paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",page_numb,".html")) 
-  #Faltan Pasos para obtener la tabla (completar ustedes)
-  x %>% html_table() %>% as.data.frame()
-}
-
-db_list<-lapply(1:10,readHTML)  #itera sobre las páginas y retorna una lista con 10 elementos
-db<-do.call(rbind,db_list) #une todo en un data.frame
-
-## Mi intento
-
-
-
-tabla_loop <-  data.frame()
-for (PS1 in seq(from = 1, to = 10, by = 1)){
-  url <- paste0("https://ignaciomsarmiento.github.io/GEIH2018_sample/pages/geih_page_",PS1,".html")
-  total_data <- read_html(url)
-}
-
-tabla_loop =  rbind(tabla_loop, data.frame())
-
-print(paste("Data_Chunk:",PS1))
-
-view(tabla_loop)
-view(GEIH_BOG18)
