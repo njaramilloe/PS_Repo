@@ -21,6 +21,7 @@ for (i in 1:10) {
    geih_bog18 <- bind_rows(tabla, geih_bog18)
    print("BD", i)
 }
+geihbog18<-  geih_bog18 %>% filter(age > 17)
 
 ## Mantener la memoria limpia en caso de requerir capacidad para el procesamiento de datos
 rm(list = "url", i, "tabla", data_chunk)
