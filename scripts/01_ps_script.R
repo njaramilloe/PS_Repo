@@ -30,9 +30,10 @@ str(geihbog18)
 ## Mantener la memoria limpia en caso de requerir capacidad para el procesamiento de datos
 rm(list = "url", i, "tabla", data_chunk)
 
-#ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
-# Keep a couple  of predictors and look at  statistics
+# Keep a couple  of predictors
 geihbog18_selected <- geihbog18  %>% select(ingtot, 
+                        impa, 
+                        hoursWorkUsual,
                         age,
                         sex,
                         oficio,
@@ -41,42 +42,36 @@ geihbog18_selected <- geihbog18  %>% select(ingtot,
                         ocu,
                         p6210s1)
 
-#Descriptive statistics
-summary_table <- stargazer(data.frame(geihbog18_selected), header=FALSE, type='text',title="Variables Included in the Selected Data Set")
-
-#Export descriptive analysis of selected variables in latex
-write(summary_table, file = "summary_table.tex")
-
-#Export descriptive analysis of selected variable in word
-##Create a Word document using the read_docx() function from the officer package
-doc <- read_docx()
-
-##Add the table to the Word document using the body_add_flextable() function
-flextable <- flextable(as.data.frame(summary_table))
-doc <- body_add_flextable(doc, flextable)
-
-##Save the Word document
-print(doc, target = "summary_table.docx")
-
-
 #REVISAR POR MISSING VALUES ----------------------------------------------------
 missing_values <- is.na(geihbog18_selected)
 
-#Eliminar missings de la columna de la y
-geihbog18_clean <- na.omit(geihbog18_selected, cols="ingtot")
+#Eliminar missings de la columna de horas trabajadas por semana
+geihbog18_clean <- na.omit(geihbog18_selected, cols="hoursWorkUsual")
 
+#ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
+#Descriptive statistics
+summary_table <- stargazer(data.frame(geihbog18_clean), title = "Variables Included in the Selected Data Set", align = TRUE)
+
+#Export descriptive analysis of selected variables in latex
+writeLines(summary_table, "summary_table.tex")
 
 #REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
 ##Create the age square variable 
 geihbog18_clean <- geihbog18_clean  %>% mutate(age2=age^2)
+geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(impa/(hoursWorkUsual*4)))
+
+geihbog18_filtered <- geihbog18_clean %>%
+  filter(ln_wage != -Inf)
 
 #Regress
-reg_age <- lm(log(ingtot) ~ age + age2, geihbog18_clean) #No corre por el siguiente error:
+reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
 
-#Error in lm.fit(x, y, offset = offset, singular.ok = singular.ok, ...) : NA/NaN/Inf in 'y'
-#pero ya limpiamos los missings de la variable y. Cómo podemos solucionar?
+#Generate the LaTeX code using the stargazer function and store it in a variable
+regression_table <- stargazer(reg_age, title = "Regression Results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
 
-stargazer(reg_age,type="text",omit.stat = c("ser", "f", "adj.rsq"))
+#Save the LaTeX code to a text file
+writeLines(latex_code, "regression_table.tex")
+
 
 #Bootstrap to construct the confidence intervals
 p_load("boot")
