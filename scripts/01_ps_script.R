@@ -31,7 +31,7 @@ str(geihbog18)
 rm(list = "url", i, "tabla", data_chunk)
 
 # Keep a couple  of predictors
-geihbog18_selected <- geihbog18  %>% select(ingtot, 
+geihbog18_selected <- geihbog18  %>% select(y_ingLab_m_ha, 
                         impa, 
                         hoursWorkUsual,
                         age,
@@ -41,6 +41,7 @@ geihbog18_selected <- geihbog18  %>% select(ingtot,
                         college,
                         ocu,
                         p6210s1)
+
 
 #REVISAR POR MISSING VALUES ----------------------------------------------------
 missing_values <- is.na(geihbog18_selected)
@@ -55,10 +56,13 @@ summary_table <- stargazer(data.frame(geihbog18_clean), title = "Variables Inclu
 #Export descriptive analysis of selected variables in latex
 writeLines(summary_table, "summary_table.tex")
 
+
 #REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
-##Create the age square variable 
+##Create the age square and the log(wage) variables
 geihbog18_clean <- geihbog18_clean  %>% mutate(age2=age^2)
-geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(impa/(hoursWorkUsual*4)))
+geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(y_ingLab_m_ha))
+
+#geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(impa/(hoursWorkUsual*4)))
 
 geihbog18_filtered <- geihbog18_clean %>%
   filter(ln_wage != -Inf)
@@ -69,43 +73,40 @@ reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
 #Generate the LaTeX code using the stargazer function and store it in a variable
 regression_table <- stargazer(reg_age, title = "Regression Results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
 
-#Save the LaTeX code to a text file
-writeLines(latex_code, "regression_table.tex")
 
-
-#Bootstrap to construct the confidence intervals
+#BOOTSTRAP to construct the confidence intervals -------------------------------
 p_load("boot")
 
 #Define a function that will extract the coefficients from the model based on bootstrap samples
-get_coefficients <- function(geihbog18_clean, indices) {
-  fit <- lm(log(ingtot) ~ age + age2, data = geihbog18_clean[indices, ])
+get_coefficients <- function(geihbog18_filtered, indices) {
+  fit <- lm(ln_wage ~ age + age2, data = geihbog18_filtered[indices, ])
   return(coef(fit))
 }
 
 #Use the boot function to perform the bootstrap procedure and calculate the confidence intervals
 ##Set stype = "i" to obtain the percentile intervals
-boot_results <- boot(data = geihbog18_clean, statistic = get_coefficients, R = 1000)
+boot_results <- boot(data = geihbog18_filtered, statistic = get_coefficients, R = 1000)
 confidence_intervals <- boot.ci(boot_results, type = "perc")
 
 #Obtain the confidence intervals
 confidence_intervals_95 <- confidence_intervals$percent[, 4]
 
 #Plot of the estimated age-earnings profile
-geihbog18_clean <- geihbog18_clean  %>% mutate(yhat=predict(reg_age))
+geihbog18_filtered <- geihbog18_filtered  %>% mutate(yhat=predict(reg_age))
 
-summ = geihbog18_clean %>%  
+summ = geihbog18_filtered %>%  
   group_by(
     age, age2
   ) %>%  
   summarize(
-    mean_y = mean(ingtot),
+    mean_y = mean(ln_wage),
     yhat_reg = mean(yhat), .groups="drop"
   ) 
 
 
 ggplot(summ) + 
   geom_line(
-    aes(x = afqt, y = yhat_reg), 
+    aes(x = mean_y, y = yhat_reg), 
     color = "green", size = 1.5
   ) + 
   labs(
