@@ -3,7 +3,8 @@ rm(list = ls())
 library(pacman)
 library(ggplot2)
 library(dplyr)
-p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, stargazer)
+p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, stargazer,expss)
+install.packages("DT")
 
 
 # PASO 1: CARGAR LOS DATOS ---------------------------------------------------- 
@@ -30,8 +31,19 @@ str(geihbog18)
 ## Mantener la memoria limpia en caso de requerir capacidad para el procesamiento de datos
 rm(list = "url", i, "tabla", data_chunk)
 
+#Estadísticas descriptivas para determinar la y
+as.datatable_widget(geihbog18 %>%
+                      tab_cells(y_total_m_ha, y_ingLab_m_ha) %>%
+                      tab_cols(total(), cuentaPropia) %>%
+                      tab_stat_mean(label = "Media") %>%
+                      tab_stat_sd(label = "Desviación") %>% 
+                      tab_pivot())
+
+mini_tabla <- geihbog18  %>% select(y_total_m_ha,hoursWorkUsual)
+                                         
+
 # Keep a couple  of predictors
-geihbog18_selected <- geihbog18  %>% select(y_ingLab_m_ha, 
+geihbog18_selected <- geihbog18  %>% select(y_total_m_ha, 
                         impa, 
                         hoursWorkUsual,
                         age,
@@ -42,12 +54,24 @@ geihbog18_selected <- geihbog18  %>% select(y_ingLab_m_ha,
                         ocu,
                         p6210s1)
 
+#REVISAR POR CEROS
+install.packages("VIM")
+library(VIM)
+mice_plot <- aggr(iris.mis, col=c('navyblue','yellow'),
+                    numbers=TRUE, sortVars=TRUE,
+                    labels=names(iris.mis), cex.axis=.7,
+                    gap=3, ylab=c("Missing data","Pattern"))
+
 
 #REVISAR POR MISSING VALUES ----------------------------------------------------
 missing_values <- is.na(geihbog18_selected)
 
 #Eliminar missings de la columna de horas trabajadas por semana
-geihbog18_clean <- na.omit(geihbog18_selected, cols="hoursWorkUsual")
+geihbog18_filtered <- na.omit(geihbog18_selected, cols="hoursWorkUsual")
+
+#Exportar base de datos
+write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/geihbog18_filtered.txt", sep = ";",
+            row.names = TRUE)
 
 #ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
 #Descriptive statistics
@@ -60,19 +84,14 @@ writeLines(summary_table, "summary_table.tex")
 #REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
 ##Create the age square and the log(wage) variables
 geihbog18_clean <- geihbog18_clean  %>% mutate(age2=age^2)
-geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(y_ingLab_m_ha))
+geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(y_total_m_ha))
 
-#geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(impa/(hoursWorkUsual*4)))
-
-geihbog18_filtered <- geihbog18_clean %>%
-  filter(ln_wage != -Inf)
 
 #Regress
 reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
 
 #Generate the LaTeX code using the stargazer function and store it in a variable
 regression_table <- stargazer(reg_age, title = "Regression Results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
-
 
 #BOOTSTRAP to construct the confidence intervals -------------------------------
 p_load("boot")
@@ -106,7 +125,7 @@ summ = geihbog18_filtered %>%
 
 ggplot(summ) + 
   geom_line(
-    aes(x = mean_y, y = yhat_reg), 
+    aes(x = age, y = yhat_reg), 
     color = "green", size = 1.5
   ) + 
   labs(
@@ -115,9 +134,6 @@ ggplot(summ) +
     y = "log Wages"
   ) +
   theme_bw()
-
-
-
 
 
 #ALTERNATIVA: Bind Manual ---------------------------------------------------- 
