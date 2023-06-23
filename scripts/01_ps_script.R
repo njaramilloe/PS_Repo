@@ -73,12 +73,25 @@ geihbog18_filtered <- na.omit(geihbog18_selected, cols="hoursWorkUsual")
 write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/geihbog18_filtered.txt", sep = ";",
             row.names = TRUE)
 
+
+
+
+
+
+
+
 #ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
 #Descriptive statistics
 summary_table <- stargazer(data.frame(geihbog18_clean), title = "Variables Included in the Selected Data Set", align = TRUE)
 
 #Export descriptive analysis of selected variables in latex
 writeLines(summary_table, "summary_table.tex")
+
+
+
+
+
+
 
 
 #REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
@@ -92,6 +105,13 @@ reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
 
 #Generate the LaTeX code using the stargazer function and store it in a variable
 regression_table <- stargazer(reg_age, title = "Regression Results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
+
+
+
+
+
+
+
 
 #BOOTSTRAP to construct the confidence intervals -------------------------------
 p_load("boot")
