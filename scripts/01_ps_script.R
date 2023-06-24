@@ -55,16 +55,18 @@ geihbog18_selected <- geihbog18  %>% select(y_total_m_ha,
                         p6210s1)
 
 #REVISAR POR CEROS
-install.packages("VIM")
-library(VIM)
-mice_plot <- aggr(iris.mis, col=c('navyblue','yellow'),
-                    numbers=TRUE, sortVars=TRUE,
-                    labels=names(iris.mis), cex.axis=.7,
-                    gap=3, ylab=c("Missing data","Pattern"))
-
+lapply(geihbog18_selected, function(x){ length(which(x==0))/length(x)})
 
 #REVISAR POR MISSING VALUES ----------------------------------------------------
 missing_values <- is.na(geihbog18_selected)
+
+install.packages("VIM")
+library(VIM)
+mice_plot <- aggr(geihbog18_selected, col=c('navyblue','yellow'),
+                  numbers=TRUE, sortVars=TRUE,
+                  labels=names(geihbog18_selected), cex.axis=.7,
+                  gap=3, ylab=c("Missing data","Pattern"))
+
 
 #Eliminar missings de la columna de horas trabajadas por semana
 geihbog18_filtered <- na.omit(geihbog18_selected, cols="hoursWorkUsual")
