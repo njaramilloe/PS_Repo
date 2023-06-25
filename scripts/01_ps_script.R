@@ -116,6 +116,9 @@ geihbog18_filtered<- geihbog18_filtered  %>% mutate(age2=age^2)
 geihbog18_filtered <- geihbog18_filtered  %>% mutate(ln_wage = log(y_total_m_ha))
 
 
+geihbog18_selected <- geihbog18_selected  %>% mutate(age2=age^2)
+geihbog18_selected <- geihbog18_selected  %>% mutate(ln_wage = log(y_total_m_ha))
+
 #Exportar base de datos
 write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/geihbog18_filtered.txt", sep = ";",
             row.names = TRUE)
@@ -129,10 +132,6 @@ summary_table <- stargazer(data.frame(geihbog18_selected), title = "Variables In
 
 #Export descriptive analysis of selected variables in latex
 writeLines(summary_table, "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/summary_table.tex")
-
-
-
-
 
 
 
@@ -165,7 +164,6 @@ confidence_intervals_95 <- confidence_intervals$percent[, 4]
 
 #Plot of the estimated age-earnings profile
 geihbog18_selected <- geihbog18_selected  %>% mutate(yhat=predict(reg_age))
-
 summ = geihbog18_selected %>%  
   group_by(
     age, age2
