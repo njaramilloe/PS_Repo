@@ -7,9 +7,7 @@ library(pacman)
 library(ggplot2)
 library(dplyr)
 library(VIM)
-p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, stargazer,expss)
-
-
+p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, stargazer,expss, boot)
 
 
 # CARGAR LOS DATOS ---------------------------------------------------- 
@@ -27,6 +25,7 @@ for (i in 1:10) {
    geih_bog18 <- bind_rows(tabla, geih_bog18)
    print("BD", i)
 }
+
 geihbog18<-geih_bog18 %>% filter(age > 17)
 
 view(geihbog18)
@@ -70,12 +69,50 @@ mice_plot <- aggr(geihbog18_selected, col=c('navyblue','yellow'),
                   gap=3, ylab=c("Missing data","Pattern"))
 
 #Eliminar missings de la columna de horas trabajadas por semana
-geihbog18_filtered <- na.omit(geihbog18, cols="hoursWorkUsual")
-geihbog18_selected <- na.omit(geihbog18, cols="hoursWorkUsual")
+geihbog18_filtered <- geihbog18  %>% select(y_total_m_ha, 
+                                            hoursWorkUsual,
+                                            age,
+                                            sex,
+                                            oficio,
+                                            relab,
+                                            college,
+                                            ocu,
+                                            p6210s1, 
+                                            clase,
+                                            cotPension,
+                                            cuentaPropia,
+                                            depto,
+                                            directorio,
+                                            dominio,
+                                            dsi,
+                                            estrato1,
+                                            fex_c,
+                                            fex_dpto,
+                                            formal,
+                                            fweight,
+                                            inac,
+                                            informal,
+                                            maxEducLevel,
+                                            mes,
+                                            pea,
+                                            pet,
+                                            relab,
+                                            secuencia_p,
+                                            sizeFirm,
+                                            wap,
+                                            regSalud)
+
+geihbog18_filtered <- na.omit(geihbog18_filtered, cols="hoursWorkUsual")
+missing_values <- is.na(geihbog18_filtered)
+
+
+geihbog18_selected <- na.omit(geihbog18_selected, cols="hoursWorkUsual")
+missing_values <- is.na(geihbog18_selected)
+
 
 #Generar nuevas variables
 ##Create the age square and the log(wage) variables
-geihbog18_filtered <- geihbog18_filtered  %>% mutate(age2=age^2)
+geihbog18_filtered<- geihbog18_filtered  %>% mutate(age2=age^2)
 geihbog18_filtered <- geihbog18_filtered  %>% mutate(ln_wage = log(y_total_m_ha))
 
 
@@ -102,7 +139,7 @@ writeLines(summary_table, "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stor
 
 #REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
 #Regress
-reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
+reg_age <- lm(ln_wage ~ age + age2, geihbog18_selected)
 summary(reg_age)
 
 #Generate the LaTeX code using the stargazer function and store it in a variable
@@ -112,26 +149,24 @@ regression_table <- stargazer(reg_age, title = "Regression Results", align = TRU
 
 
 #BOOTSTRAP to construct the confidence intervals -------------------------------
-p_load("boot")
-
 #Define a function that will extract the coefficients from the model based on bootstrap samples
-get_coefficients <- function(geihbog18_filtered, indices) {
-  fit <- lm(ln_wage ~ age + age2, data = geihbog18_filtered[indices, ])
+get_coefficients <- function(geihbog18_selected, indices) {
+  fit <- lm(ln_wage ~ age + age2, data = geihbog18_selected[indices, ])
   return(coef(fit))
 }
 
 #Use the boot function to perform the bootstrap procedure and calculate the confidence intervals
 ##Set stype = "i" to obtain the percentile intervals
-boot_results <- boot(data = geihbog18_filtered, statistic = get_coefficients, R = 1000)
+boot_results <- boot(data = geihbog18_selected, statistic = get_coefficients, R = 1000)
 confidence_intervals <- boot.ci(boot_results, type = "perc")
 
 #Obtain the confidence intervals
 confidence_intervals_95 <- confidence_intervals$percent[, 4]
 
 #Plot of the estimated age-earnings profile
-geihbog18_filtered <- geihbog18_filtered  %>% mutate(yhat=predict(reg_age))
+geihbog18_selected <- geihbog18_selected  %>% mutate(yhat=predict(reg_age))
 
-summ = geihbog18_filtered %>%  
+summ = geihbog18_selected %>%  
   group_by(
     age, age2
   ) %>%  
