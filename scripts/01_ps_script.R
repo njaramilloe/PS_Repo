@@ -205,8 +205,11 @@ age_earnings_plot <- ggplot(summ) +
     x = "Age",
     y = "log Wages"
   ) +
-  theme_bw()
+  theme_bw() 
 
+age_earnings_plot <- age_earnings_plot +
+  geom_vline(xintercept = c(34.58, 49.45), linetype = "dashed", color = "red")
+  
 # Export ggplot as PNG
 ggsave("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/age_earnings_plot.png", plot = age_earnings_plot, width = 6, height = 4, dpi = 300)
 
