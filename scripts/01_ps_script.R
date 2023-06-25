@@ -30,7 +30,7 @@ geihbog18<-geih_bog18 %>% filter(age > 17)
 
 view(geihbog18)
 
-str(geihbog18)
+names(geihbog18)
 
 ## Mantener la memoria limpia en caso de requerir capacidad para el procesamiento de datos
 rm(list = "url", i, "tabla", data_chunk)
