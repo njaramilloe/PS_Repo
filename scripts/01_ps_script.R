@@ -58,7 +58,7 @@ geihbog18_selected <- geihbog18  %>% select(y_total_m_ha,
                                             relab,
                                             college,
                                             ocu,
-                                            p6210s1)
+                                            maxEducLevel)
 
 #Ahora si, revisar por missing values
 missing_values <- is.na(geihbog18_selected)
@@ -76,8 +76,7 @@ geihbog18_filtered <- geihbog18  %>% select(y_total_m_ha,
                                             oficio,
                                             relab,
                                             college,
-                                            ocu,
-                                            p6210s1, 
+                                            ocu, 
                                             clase,
                                             cotPension,
                                             cuentaPropia,
