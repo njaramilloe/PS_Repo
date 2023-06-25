@@ -12,7 +12,7 @@ p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, stargazer,expss)
 
 
 
-# PASO 1: CARGAR LOS DATOS ---------------------------------------------------- 
+# CARGAR LOS DATOS ---------------------------------------------------- 
 
 # Realizar un loop para adjuntar los 10 archivos en los cuales se encuentra 
 # divida la base de datos GEIH de Bogotá 2018"
@@ -71,6 +71,13 @@ mice_plot <- aggr(geihbog18_selected, col=c('navyblue','yellow'),
 
 #Eliminar missings de la columna de horas trabajadas por semana
 geihbog18_filtered <- na.omit(geihbog18, cols="hoursWorkUsual")
+geihbog18_selected <- na.omit(geihbog18, cols="hoursWorkUsual")
+
+#Generar nuevas variables
+##Create the age square and the log(wage) variables
+geihbog18_filtered <- geihbog18_filtered  %>% mutate(age2=age^2)
+geihbog18_filtered <- geihbog18_filtered  %>% mutate(ln_wage = log(y_total_m_ha))
+
 
 #Exportar base de datos
 write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/geihbog18_filtered.txt", sep = ";",
@@ -81,7 +88,7 @@ write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub
 
 #ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
 #Descriptive statistics
-summary_table <- stargazer(data.frame(geihbog18_filtered), title = "Variables Included in the Selected Data Set", align = TRUE, omit.stat = c("n"))
+summary_table <- stargazer(data.frame(geihbog18_selected), title = "Variables Included in the Selected Data Set", align = TRUE, omit.stat = c("n"))
 
 #Export descriptive analysis of selected variables in latex
 writeLines(summary_table, "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/summary_table.tex")
@@ -94,11 +101,6 @@ writeLines(summary_table, "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stor
 
 
 #REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
-##Create the age square and the log(wage) variables
-geihbog18_clean <- geihbog18_clean  %>% mutate(age2=age^2)
-geihbog18_clean <- geihbog18_clean  %>% mutate(ln_wage = log(y_total_m_ha))
-
-
 #Regress
 reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
 
