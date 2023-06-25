@@ -103,6 +103,7 @@ writeLines(summary_table, "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stor
 #REGRESIÓN : log(wage) = b1 + b2(age) + b3(age)^2 + u -------------------------
 #Regress
 reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
+summary(reg_age)
 
 #Generate the LaTeX code using the stargazer function and store it in a variable
 regression_table <- stargazer(reg_age, title = "Regression Results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
