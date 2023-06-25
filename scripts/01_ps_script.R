@@ -68,6 +68,9 @@ mice_plot <- aggr(geihbog18_selected, col=c('navyblue','yellow'),
                   labels=names(geihbog18_selected), cex.axis=.7,
                   gap=3, ylab=c("Missing data","Pattern"))
 
+ggsave("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/mice_plot.png", plot = mice_plot, width = 6, height = 4, dpi = 300)
+
+
 #Eliminar missings de la columna de horas trabajadas por semana
 geihbog18_filtered <- geihbog18  %>% select(y_total_m_ha, 
                                             hoursWorkUsual,
@@ -123,11 +126,33 @@ write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub
 
 
 #ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
-#Descriptive statistics
-summary_table <- stargazer(data.frame(geihbog18_selected), title = "Variables Included in the Selected Data Set", align = TRUE, omit.stat = c("n"))
+#Descriptive statistics of continuos and dicotomic variables
+summary_table <- stargazer(data.frame(geihbog18_selected), exclude = c("oficio", "relab"), title = "Variables Included in the Selected Data Set", align = TRUE, omit.stat = c("n"))
 
 #Export descriptive analysis of selected variables in latex
 writeLines(summary_table, "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/summary_table.tex")
+
+#Descriptive statistics of categorical variables
+maxEducLevel<-ggplot(geihbog18_selected, aes(x = `maxEducLevel`)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Frecuency analysis of the Maximum Educational Level Attained")
+# Export ggplot as PNG
+ggsave("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/maxEducLevel.png", plot = maxEducLevel, width = 6, height = 4, dpi = 300)
+
+oficio<-ggplot(geihbog18_selected, aes(x = `oficio`)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Frecuency analysis of the Occupation")
+# Export ggplot as PNG
+ggsave("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/oficio.png", plot = oficio, width = 6, height = 4, dpi = 300)
+
+relab<-ggplot(geihbog18_selected, aes(x = `relab`)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Frecuency analysis of the type of occupation")
+# Export ggplot as PNG
+ggsave("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/relab.png", plot = relab, width = 6, height = 4, dpi = 300)
 
 
 
@@ -170,7 +195,7 @@ summ = geihbog18_selected %>%
   ) 
 
 
-ggplot(summ) + 
+age_earnings_plot <- ggplot(summ) + 
   geom_line(
     aes(x = age, y = yhat_reg), 
     color = "green", size = 1.5
@@ -181,6 +206,9 @@ ggplot(summ) +
     y = "log Wages"
   ) +
   theme_bw()
+
+# Export ggplot as PNG
+ggsave("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/age_earnings_plot.png", plot = age_earnings_plot, width = 6, height = 4, dpi = 300)
 
 
 #ALTERNATIVA: Bind Manual ---------------------------------------------------- 
