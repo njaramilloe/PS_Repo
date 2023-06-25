@@ -1,10 +1,15 @@
 rm(list = ls())
 
+
+install.packages("DT")
+install.packages("VIM")
 library(pacman)
 library(ggplot2)
 library(dplyr)
+library(VIM)
 p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, stargazer,expss)
-install.packages("DT")
+
+
 
 
 # PASO 1: CARGAR LOS DATOS ---------------------------------------------------- 
@@ -39,37 +44,33 @@ as.datatable_widget(geihbog18 %>%
                       tab_stat_sd(label = "Desviación") %>% 
                       tab_pivot())
 
-mini_tabla <- geihbog18  %>% select(y_total_m_ha,hoursWorkUsual)
-                                         
+#REVISAR POR CEROS
+lapply(geihbog18, function(x){ length(which(x==0))/length(x)})
+
+#REVISAR POR MISSING VALUES ----------------------------------------------------
+#Seleccionamos algunas variables relevantes para hacer más fácil la interpretación de las gráficas
 
 # Keep a couple  of predictors
 geihbog18_selected <- geihbog18  %>% select(y_total_m_ha, 
-                        impa, 
-                        hoursWorkUsual,
-                        age,
-                        sex,
-                        oficio,
-                        relab,
-                        college,
-                        ocu,
-                        p6210s1)
+                                            hoursWorkUsual,
+                                            age,
+                                            sex,
+                                            oficio,
+                                            relab,
+                                            college,
+                                            ocu,
+                                            p6210s1)
 
-#REVISAR POR CEROS
-lapply(geihbog18_selected, function(x){ length(which(x==0))/length(x)})
-
-#REVISAR POR MISSING VALUES ----------------------------------------------------
+#Ahora si, revisar por missing values
 missing_values <- is.na(geihbog18_selected)
 
-install.packages("VIM")
-library(VIM)
 mice_plot <- aggr(geihbog18_selected, col=c('navyblue','yellow'),
                   numbers=TRUE, sortVars=TRUE,
                   labels=names(geihbog18_selected), cex.axis=.7,
                   gap=3, ylab=c("Missing data","Pattern"))
 
-
 #Eliminar missings de la columna de horas trabajadas por semana
-geihbog18_filtered <- na.omit(geihbog18_selected, cols="hoursWorkUsual")
+geihbog18_filtered <- na.omit(geihbog18, cols="hoursWorkUsual")
 
 #Exportar base de datos
 write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/geihbog18_filtered.txt", sep = ";",
@@ -78,16 +79,12 @@ write.table(geihbog18_filtered, file = "/Users/nataliajaramillo/Documents/GitHub
 
 
 
-
-
-
-
 #ESTADÍSTICAS DESCRIPTIVAS ----------------------------------------------------
 #Descriptive statistics
-summary_table <- stargazer(data.frame(geihbog18_clean), title = "Variables Included in the Selected Data Set", align = TRUE)
+summary_table <- stargazer(data.frame(geihbog18_filtered), title = "Variables Included in the Selected Data Set", align = TRUE, omit.stat = c("n"))
 
 #Export descriptive analysis of selected variables in latex
-writeLines(summary_table, "summary_table.tex")
+writeLines(summary_table, "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/stores/summary_table.tex")
 
 
 
@@ -107,10 +104,6 @@ reg_age <- lm(ln_wage ~ age + age2, geihbog18_filtered)
 
 #Generate the LaTeX code using the stargazer function and store it in a variable
 regression_table <- stargazer(reg_age, title = "Regression Results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
-
-
-
-
 
 
 
