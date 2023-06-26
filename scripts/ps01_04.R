@@ -75,12 +75,13 @@ skim(geihbog18_filtered)
   # 3.1 We first estimate the conditional regression using standard lm
   standardreg <- lm(ln_wage ~ gender + formal + relab + college + oficio, data 
                      = geihbog18_filtered, x = TRUE)
-  residuals_FWL2 <- residuals(regFWL2)
+  residuals_sr <- residuals(standardreg)
   
   #3.2 Now, we will estimate using FWL. We regress gender on the rest of the 
   #'variables and store the residuals. Next, we regress ln wage on the rest of 
   #'the variables, excluding gender, and store the residuals. Finally, regress 
-  #'the residuals of the second regression on the residuals of the first regression. 
+  #'the residuals of the second regression on the residuals of the first 
+  #'regression. (4b.i)
   geihbog18_filtered<-geihbog18_filtered %>% mutate(genderResidF=lm(gender ~ formal + relab + college + oficio,geihbog18_filtered)$residuals) #Residuals of gender~rest of xi
   geihbog18_filtered<-geihbog18_filtered %>% mutate(wageResidF=lm(ln_wage ~ formal + relab + college + oficio,geihbog18_filtered)$residuals) #Residuals of gender~rest of xi
   regFWL<-lm(wageResidF~genderResidF,geihbog18_filtered)
@@ -98,35 +99,73 @@ skim(geihbog18_filtered)
  # sqrt(diag(vcov(regFWL)))[4]
   
   #3.5 We will proceed to estimate the conditional wage gap using FWL and 
-  #bootstrap. We perform the boostrap estimation based on the FWL estimation and
-  #later calculate the confidence intervals.
+  #'bootstrap.We create function to be used during the boot command.  
   
   fwl_regression <- function(geihbog18_filtered, indices) {
     # Subset the data based on the bootstrap indices
     bootstrap_data <- geihbog18_filtered[indices, ]
-    
     # Estimate the residuals of gender~rest of xi
-    gender_resid <- residuals(lm(gender ~ formal + relab + college + oficio, data = bootstrap_data))
-    
+    gender_resid <- residuals(lm(gender ~ formal + relab + college + oficio, 
+                                 data = bootstrap_data))
     # Estimate the residuals of ln_wage~rest of xi
-    wage_resid <- residuals(lm(ln_wage ~ formal + relab + college + oficio, data = bootstrap_data))
-    
+    wage_resid <- residuals(lm(ln_wage ~ formal + relab + college + oficio, 
+                               data = bootstrap_data))
     # Perform the FWL regression using the residuals
     fwl_model <- lm(wage_resid ~ gender_resid, data = bootstrap_data)
-    
-    # Return the estimated coefficient for gender_resid
-    return(coef(fwl_model)["gender_resid"])
+    # Return the estimated coefficient for the model
+    return(coef(fwl_model))
   }
-
+  #We make sure the function works
+  fwl_regression(geihbog18_filtered, 1:13519)
+ 
+ #3.6 We perform the bootstrap estimation based on the FWL specification 
+  #'(4b.ii). We store the results of the coefficients and calculate the standard
+  #' errors manually. Finally, we specify and obtain the confidence intervals. 
+ 
   boot_results <- boot(data = geihbog18_filtered, statistic = fwl_regression, R = 1000)
+  boot_results
+  estimated_coefs <- boot_results$t0
+  estimated_coefs
+  sqrt(var(estimated_coefs))
+  
   confidence_intervals <- boot.ci(boot_results, type = "perc")
+  confidence_intervals_95 <- confidence_intervals$percent[, 4]
+  confidence_intervals
+  confidence_intervals_95
   
-  print(boot_results$t0)    # Estimated coefficient
-  print(confidence_intervals) 
+  #3.7 We will export the results of the three regressions in this point.
+  boot_model <- lm(estimated_coefs ~ 1)
+  coef_names <- c("Intercept", "genderResidF")
+  stargazer(boot_results$t0*, type="text")
+  stargazer(standardreg,regFWL,boot_model,type="text",digits=7, coef.var=coef_names)
+  regression_table <- stargazer(standardreg,regFWL,estimated_coefs, title = "Unconditional and conditional wage gap regression results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
   
-  stargazer(standardreg,regFWL,boot_results,type="text",digits=7)
+#################################################################
+  # Extract the coefficient estimates from the models
+  coef_standardreg <- coef(standardreg)
+  coef_regFWL <- coef(regFWL)
+  coef_boot_model <-estimated_coefs
   
-  sum(resid(standardreg)^2)
-  sum(resid(regFWL)^2)
-  sum(resid(boot_results)^2)
+  # Create a matrix with the coefficient estimates
+  coef_matrix <- matrix(c(coef_standardreg, coef_regFWL, coef_boot_model), nrow = 3, byrow = TRUE)
+  coef(regFWL)
+  # Create a character vector with the row names
+  row_names <- c("Standard Regression", "FWL Regression", "Bootstrap")
   
+  # Create a data frame with the coefficient matrix and row names
+  coef_df <- data.frame(coef_matrix, row.names = row_names)
+  
+  # Rename the columns
+  colnames(coef_df) <- coef_names
+  
+  # Print the coefficient table
+  print(coef_df)
+  _______
+  
+  class(standardreg)
+  class(regFWL)
+  class(boot_results)
+  
+#4 Age & gender wage analysis ##################################################
+#' Now, we will plot the predicted age-wage profile and estimate the implied 
+#' “peak ages” with the respective confidence intervals by gender.
