@@ -95,9 +95,6 @@ skim(geihbog18_filtered)
   sum(resid(standardreg)^2)
   sum(resid(regFWL)^2)
   
- # sqrt(diag(vcov(standardreg))*(13513/13517))[2]
- # sqrt(diag(vcov(regFWL)))[4]
-  
   #3.5 We will proceed to estimate the conditional wage gap using FWL and 
   #'bootstrap.We create function to be used during the boot command.  
   
@@ -125,6 +122,11 @@ skim(geihbog18_filtered)
   boot_results <- boot(data = geihbog18_filtered, statistic = fwl_regression, R = 1000)
   boot_results
   estimated_coefs <- boot_results$t0
+  bias <- boot_results$t
+  print(bias)
+  std_error <- boot_results$se
+  boot_results_df <- data.frame(original = estimated_coefs)
+?data.frame
   estimated_coefs
   sqrt(var(estimated_coefs))
   
@@ -133,39 +135,51 @@ skim(geihbog18_filtered)
   confidence_intervals
   confidence_intervals_95
   
-  #3.7 We will export the results of the three regressions in this point.
-  boot_model <- lm(estimated_coefs ~ 1)
-  coef_names <- c("Intercept", "genderResidF")
-  stargazer(boot_results$t0*, type="text")
-  stargazer(standardreg,regFWL,boot_model,type="text",digits=7, coef.var=coef_names)
-  regression_table <- stargazer(standardreg,regFWL,estimated_coefs, title = "Unconditional and conditional wage gap regression results", align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
-  
-#################################################################
-  # Extract the coefficient estimates from the models
-  coef_standardreg <- coef(standardreg)
-  coef_regFWL <- coef(regFWL)
-  coef_boot_model <-estimated_coefs
-  
-  # Create a matrix with the coefficient estimates
-  coef_matrix <- matrix(c(coef_standardreg, coef_regFWL, coef_boot_model), nrow = 3, byrow = TRUE)
-  coef(regFWL)
-  # Create a character vector with the row names
-  row_names <- c("Standard Regression", "FWL Regression", "Bootstrap")
-  
-  # Create a data frame with the coefficient matrix and row names
-  coef_df <- data.frame(coef_matrix, row.names = row_names)
-  
-  # Rename the columns
-  colnames(coef_df) <- coef_names
-  
-  # Print the coefficient table
-  print(coef_df)
-  _______
-  
-  class(standardreg)
-  class(regFWL)
-  class(boot_results)
-  
 #4 Age & gender wage analysis ##################################################
 #' Now, we will plot the predicted age-wage profile and estimate the implied 
 #' “peak ages” with the respective confidence intervals by gender.
+ 
+  # 4.1 We adjust the database. 
+  geihbog18_filtered<- geihbog18_filtered %>% mutate(age2=age^2)
+  
+  # 4.2 Fit separate regression models for each gender and predict the wages for
+  #a range of ages.
+  model_female <- lm(ln_wage ~ age + age2, data = subset(geihbog18_filtered, gender == 1))
+  model_male <- lm(ln_wage ~ age + age2, data = subset(geihbog18_filtered, gender == 0))
+  
+  age_range <- seq(min(geihbog18_filtered$age), max(geihbog18_filtered$age), length.out = 100)
+  predictions_female <- predict(model_female, newdata = data.frame(age = age_range, age2 = age_range^2))
+  predictions_male <- predict(model_male, newdata = data.frame(age = age_range, age2 = age_range^2))
+  
+  # 4.3 Plot the predicted age--wage profile by gender
+  agewagebgender <- data.frame(age = age_range, wage_female = 
+              exp(predictions_female), wage_male = exp(predictions_male))
+  ggplot(agewagebgender) +
+    geom_line(aes(x = age, y = wage_female, color = "Female"), linetype = "solid") +
+    geom_line(aes(x = age, y = wage_male, color = "Male"), linetype = "dashed") +
+    scale_color_manual(values = c(Female = "blue", Male = "red")) +
+    labs(x = "Age", y = "Wage", color = "Gender") +
+    ggtitle("Predicted Age-Wage Profiles by Gender") +
+    theme_bw()
+  
+  # 4.4 Identify peak age and add to graph
+  max_wage_female <- geihbog18_filtered[geihbog18_filtered$gender == 1, ]
+  max_wage_female_age <- max_wage_female$age[which.max(max_wage_female$wage)]
+  print(paste("Female Age at Maximum Wage:", max_wage_female_age))
+ #42
+  max_wage_male <- geihbog18_filtered[geihbog18_filtered$gender == 0, ]
+  max_wage_male_age <- max_wage_male$age[which.max(max_wage_male$wage)]
+  print(paste("Male Age at Maximum Wage:", max_wage_male_age))
+ #50
+  # 4.4 We add the confidence interval obtained from 3.7
+  agewagebgender <- agewagebgender +
+    geom_vline(xintercept = c(49,50), linetype = "dashed", color = "red") +
+    geom_vline(xintercept = c(41,42), linetype = "dashed", color = "blue")
+  agewagebgender <- agewagebgender +
+    geom_vline(xintercept = c(49, 50), linetype = "dashed", color = "red")
+  # 4.5 Export ggplot as PNG
+  ggsave("C:/Users/maria/OneDrive - Universidad de los andes/MECA/BIG DATA/Repositorios/PS_Repo/stores/agewagebgender.png", agewagebgender, width = 6, height = 4, dpi = 300)
+  
+#5.0 Export all regression for analysis########################################
+  stargazer(reg4, standardreg, regFWL, model_female, model_male, type="text",digits=7)
+  regression_table <- stargazer(reg4, standardreg, regFWL, model_female, model_male, title = "Unconditional and conditional wage gap regressions results",  align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
