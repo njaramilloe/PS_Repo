@@ -3,7 +3,7 @@ rm(list = ls())
 library(pacman)
 library(stringr)
 library(stringi)
-p_load(rvest, tidyverse, stringr, stringi, sf, leaflet, tmaptools, caret, vtable, ggplot2, rio, skimr, caret, stargazer,expss, boot)
+p_load(rvest, tidyverse, stringr, stringi, sf, leaflet, tmaptools, caret, vtable, spatialsample, ggplot2, rio, skimr, caret, stargazer,expss, boot)
 
 # Set working directory
 setwd("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores")
@@ -45,6 +45,10 @@ variable_levels
 # Identify variables with only one level
 single_level_vars <- names(variable_levels[variable_levels == 1])
 single_level_vars
+
+#Vtable statistics
+total_table_selected<- total_table %>% select(property_id, bedrooms, bathrooms, surface_covered)
+sumtable(total_table_selected, out = "return")
 
 #Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
 total_table <- st_as_sf(
@@ -100,6 +104,7 @@ tree <- train(
   data = train_data,
   method = "rpart",
   trControl = fitControl,
+  metric = "MAE",
   tuneLength = 300 #300 valores del alfa - cost complexity parameter
 )
 
@@ -118,10 +123,32 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v1.csv",row.names=FALSE)
 
+#Predicting prices via spatial blocks cross-validation ---------------------------------------------------------------------------------------------------------------
+block_folds <- spatial_block_cv(train_data, v = 5)
+autoplot(block_folds)
+
+
+#####HAY QUE GENERAR LAS  LOCALIDADES COMO PENTAGONOS
+#Spatial Leave Location Out Cross Validation (LLOCV) 
+location_folds <-
+  spatial_leave_location_out_cv(
+    train_data,
+    group = Neighborhood
+  )
+autoplot(location_folds)
 
 #Predicting prices via a Linear Model ------------------------------------------------------------------------------------------------------------------------------
-lm_model<- lm(price ~ surface_total + surface_covered + rooms + bedrooms + bathrooms + property_type, data = train)
+lm_model<- lm(log(price) ~  DCIB + bedrooms , data = train_data)
 summary(lm_model)
+stargazer(lm_model, type = "text")
+
+
+
+
+
+
+
+
 
 
 #LOAD DATA ABOUT LOCALITIES AND NEIGHBORHOODS OF BOGOTA -----------------------------------------------------------------------------------------
