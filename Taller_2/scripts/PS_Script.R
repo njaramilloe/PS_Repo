@@ -20,9 +20,11 @@ test <- read.csv("test.csv")
 head(test)
 head(train)
 
+#Generate new variable that identifies the sample
 test<-test %>% mutate(sample="test")
 train<-train %>% mutate(sample="train")
 
+#Bind together both databases
 total_table<-rbind(test,train)
 table(total_table$sample) #test 10286 | train 38644
 
@@ -45,14 +47,13 @@ variable_levels
 single_level_vars <- names(variable_levels[variable_levels == 1])
 single_level_vars
 
-#Load geographical data -------------------------------------------------------------------------------------------------------------------------
+#Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
 total_table <- st_as_sf(
   total_table, 
   coords = c("lon","lat"), # "coords" is in x/y order -- so longitude goes first
   crs = 4326  # Set our coordinate reference system to EPSG:4326,
               # the standard WGS84 geodetic coordinate reference system
 )
-
 
 palette <- colorFactor(
   palette = c('red', 'green'),
@@ -61,39 +62,47 @@ palette <- colorFactor(
 
 map<-leaflet() %>%
   addTiles() %>% #capa base
-  addCircles(data=total_table,col=~pal(sample)) #capa casas
+  addCircles(data=total_table,col=~palette(sample)) #capa casas
 map
 
+## Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
+#Call the Centro Internacional de Bogotá location
+cib <- geocode_OSM("Centro Internacional, Bogotá", as.sf=T)
+cib
 
-## Distance to CBD -------------------------------------------------------------------------------------------------------------------------------
-cbd <- geocode_OSM("Centro Internacional, Bogotá", as.sf=T)
-cbd
+#Calculate the distances from the observations to the Point of Interest
+total_table$DCIB <- st_distance(x = total_table, y=cib)
 
-total_table$DCBD <- st_distance(x = total_table, y=cbd)
+head(total_table$DCIB)
 
-head(total_table$DCBD)
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(DCIB))
 
-total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(DCBD))
+#Divide the total data to keep only the training data variables Price and Distance to the Interest Point
+train_data<-total_table  %>% filter(sample=="train")  %>% select(price,DCIB)  %>% na.omit()
 
-train_data<-total_table  %>% filter(sample=="train")  %>% select(price,DCBD)  %>% na.omit()
-
+#Predicting prices with a tree ----------------------------------------------------------------------------------------------------------------------------
+#Train the model with Log(price)
 set.seed(123)
 tree <- train(
-  log(price) ~    DCBD,
+  log(price) ~    DCIB,
   data=train_data,
   method = "rpart",
   trControl = fitControl,
-  tuneLength=10
+  tuneLength=300 #300 valores del alfa - cost complexity parameter
 )
 
+#Predict in  the test data 
 test_data<-total_table  %>% filter(sample=="test")  
 test_data$pred_tree<-predict(tree,test_data)
 
 head(test_data  %>% select(property_id,pred_tree))
 
+#Drop the variable geometry and return Log(prices) into Price
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
 head(test_data  %>% select(property_id,pred_tree))
 
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v1.csv",row.names=FALSE)
