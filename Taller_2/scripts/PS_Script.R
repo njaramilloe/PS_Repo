@@ -3,11 +3,10 @@ rm(list = ls())
 library(pacman)
 library(stringr)
 library(stringi)
-p_load(rvest, tidyverse, stringr, stringi, sf, leaflet, tmaptools, caret, ggplot2, rio, skimr, caret, stargazer,expss, boot)
+p_load(rvest, tidyverse, stringr, stringi, sf, leaflet, tmaptools, caret, vtable, ggplot2, rio, skimr, caret, stargazer,expss, boot)
 
 # Set working directory
-setwd("/Users/nataliajaramillo/Documents/GitHub/Taller_2/stores")
-
+setwd("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
@@ -78,22 +77,30 @@ head(total_table$DCIB)
 #Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
 total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(DCIB))
 
+#Divide the total data to keep only the training data variables Price and Distance to the Interest Point
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,DCIB,bedrooms)  %>% na.omit()
+
+colSums(is.na(train_data))
+
+sum(train_data$price == 0)
+sum(train_data$bedrooms == 0)
+sum(train_data$DCIB..1. == 0)
+
+train_data <- train_data[train_data$bedrooms != 0, ]
+
 #Tell caret we want to use cross-validation 5 times #OJOOOOOO AJUSTAR PARA DATOS ESPACIALES. VER VIDEO ANTERIOR
 fitControl<-trainControl(method = "cv",
                          number=5)
-
-#Divide the total data to keep only the training data variables Price and Distance to the Interest Point
-train_data<-total_table  %>% filter(sample=="train")  %>% select(price,DCIB,bedrooms,bathrooms)  %>% na.omit()
 
 #Predicting prices with a tree ----------------------------------------------------------------------------------------------------------------------------
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
-  log(price) ~ DCIB + bedrooms + bathrooms ,
-  data=train_data,
+  log(price) ~ DCIB + bedrooms ,
+  data = train_data,
   method = "rpart",
   trControl = fitControl,
-  tuneLength=300 #300 valores del alfa - cost complexity parameter
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
 )
 
 #Predict in  the test data 
