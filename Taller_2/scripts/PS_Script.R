@@ -1,12 +1,32 @@
 rm(list = ls())
 
 library(pacman)
-library(stringr)
-library(stringi)
-p_load(rvest, tidyverse, stringr, stringi, sf, leaflet, tmaptools, caret, vtable, spatialsample, ggplot2, rio, skimr, caret, stargazer,expss, boot)
 
-# Set working directory
-setwd("/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores")
+p_load(rvest, 
+       tidyverse, #data manipulation and visualization
+       stringr, #manipulate and analyze character data
+       stringi, #manipulate string/text data in the cleaning process
+       sf, #analyze spacial data
+       leaflet, #create interactive web maps and visualizations
+       tmaptools, #support spatial data manipulation and analysis
+       caret, #Classification And REgression Training 
+       vtable, #output a descriptive variable table
+       spatialsample, #spatial resampling
+       ggplot2, #data visualization
+       rio, #import/export data file formats
+       skimr, #summary data
+       stargazer,#generate publication-quality tables
+       expss, #functions from spreadsheets and SPSS Statistics software
+       boot #bootstraping resampling
+       )
+
+
+# set working directory
+path_script <- rstudioapi::getActiveDocumentContext()$path
+path_folder <- dirname(path_script)
+setwd(path_folder)
+setwd("../stores")
+
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
@@ -84,7 +104,7 @@ total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(DCIB)
 #Divide the total data to keep only the training data variables Price and Distance to the Interest Point
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,DCIB,bedrooms)  %>% na.omit()
 
-train_data<-as.data.frame(train_data)
+train_data<-as.data.frame(train_data) 
 
 glimpse(train_data)
 train_data[,2]
