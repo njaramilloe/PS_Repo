@@ -84,7 +84,24 @@ total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(DCIB)
 #Divide the total data to keep only the training data variables Price and Distance to the Interest Point
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,DCIB,bedrooms)  %>% na.omit()
 
+train_data<-as.data.frame(train_data)
+
+glimpse(train_data)
+train_data[,2]
+train_data$columna<-as.numeric(train_data[,2,drop =T][,1])
+train_data$DCIB<-NULL
+
+glimpse(test_data)
+test_data[,17]
+test_data$columna<-as.numeric(test_data[,17,drop =T][,1])
+test_data$DCIB<-NULL
+
 colSums(is.na(train_data))
+summary(train_data)
+
+names(train_data)
+
+names(train_data) <- c("Price", "DCIB", "Bedrooms", "Geometry")
 
 sum(train_data$price == 0)
 sum(train_data$bedrooms == 0)
@@ -100,7 +117,7 @@ fitControl<-trainControl(method = "cv",
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
-  log(price) ~ DCIB + bedrooms ,
+  log(price) ~ columna + bedrooms ,
   data = train_data,
   method = "rpart",
   trControl = fitControl,
@@ -109,7 +126,7 @@ tree <- train(
 )
 
 #Predict in  the test data 
-test_data<-total_table  %>% filter(sample=="test")  
+#test_data<-total_table  %>% filter(sample=="test")  
 test_data$pred_tree<-predict(tree,test_data)
 
 head(test_data  %>% select(property_id,pred_tree))
