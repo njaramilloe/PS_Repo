@@ -16,8 +16,7 @@ p_load(rvest,
        rio, #import/export data file formats
        skimr, #summary data
        stargazer,#generate publication-quality tables
-       expss, #functions from spreadsheets and SPSS Statistics software
-       boot #bootstraping resampling
+       expss #functions from spreadsheets and SPSS Statistics software
        )
 
 
@@ -56,7 +55,7 @@ head(total_table[1:15])
 unique(total_table$property_type)
 
 #Check for missing values
-road(colSums(is.na(total_table))/nrow(total_table)*100,1) #REVISAR VIDEO DE LUCAS
+colSums(is.na(total_table))/nrow(total_table)*100 
 
 # Check the levels of each variable
 variable_levels <- sapply(total_table, function(x) length(unique(x)))
@@ -104,6 +103,7 @@ total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(DCIB)
 #Divide the total data to keep only the training data variables Price and Distance to the Interest Point
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,DCIB,bedrooms)  %>% na.omit()
 
+#Save it as a data frame
 train_data<-as.data.frame(train_data) 
 
 glimpse(train_data)
@@ -111,23 +111,19 @@ train_data[,2]
 train_data$columna<-as.numeric(train_data[,2,drop =T][,1])
 train_data$DCIB<-NULL
 
-glimpse(test_data)
-test_data[,17]
-test_data$columna<-as.numeric(test_data[,17,drop =T][,1])
-test_data$DCIB<-NULL
-
+#Check for missing values in the training data
 colSums(is.na(train_data))
 summary(train_data)
 
 names(train_data)
 
-names(train_data) <- c("Price", "DCIB", "Bedrooms", "Geometry")
+names(train_data) <- c("Price", "Bedrooms", "Geometry",  "DCIB")
 
-sum(train_data$price == 0)
-sum(train_data$bedrooms == 0)
-sum(train_data$DCIB..1. == 0)
+sum(train_data$Price == 0)
+sum(train_data$Bedrooms == 0)
+sum(train_data$DCIB == 0)
 
-train_data <- train_data[train_data$bedrooms != 0, ]
+train_data <- train_data[train_data$Bedrooms != 0, ]
 
 #Tell caret we want to use cross-validation 5 times #OJOOOOOO AJUSTAR PARA DATOS ESPACIALES. VER VIDEO ANTERIOR
 fitControl<-trainControl(method = "cv",
@@ -137,7 +133,7 @@ fitControl<-trainControl(method = "cv",
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
-  log(price) ~ columna + bedrooms ,
+  log(Price) ~ DCIB + Bedrooms ,
   data = train_data,
   method = "rpart",
   trControl = fitControl,
@@ -145,19 +141,37 @@ tree <- train(
   tuneLength = 300 #300 valores del alfa - cost complexity parameter
 )
 
-#Predict in  the test data 
-#test_data<-total_table  %>% filter(sample=="test")  
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+test_data<-as.data.frame(test_data) 
+
+glimpse(test_data)
+test_data[,17]
+test_data$columna<-as.numeric(test_data[,17,drop =T][,1])
+test_data$DCIB<-NULL
+
+#Check for missing values in the testing data
+colSums(is.na(test_data))
+summary(test_data)
+
+names(test_data)
+
+names(test_data) <- c("Property_id", "City", "Price", "Month", "Year", "Surface_total", 'Surface_covered', "Rooms", "Bedrooms", "Bathrooms", "Property_type", "Operation_type", "Title", "Description", "Sample", "Geometry",  "DCIB")
+
+#Predict the tree with test data
 test_data$pred_tree<-predict(tree,test_data)
 
-head(test_data  %>% select(property_id,pred_tree))
+head(test_data  %>% select(Property_id,pred_tree))
 
 #Drop the variable geometry and return Log(prices) into Price
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-head(test_data  %>% select(property_id,pred_tree))
+head(test_data  %>% select(Property_id,pred_tree))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-test_data  %>% select(property_id,pred_tree)
+submit<-test_data  %>% select(Property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
+submit <- submit  %>% rename(property_id=Property_id)
 write.csv(submit,"Tree_v1.csv",row.names=FALSE)
 
 #Predicting prices via spatial blocks cross-validation ---------------------------------------------------------------------------------------------------------------
