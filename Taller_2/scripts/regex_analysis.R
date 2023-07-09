@@ -333,7 +333,7 @@ repeated_words <- c("bogota", "apartamento", "casa", "apartaestudio", "cod",
                     "ultimas unidades", "unir", "usada", "prospecto", "recibir", 
                     "hotelera", "utilizacion", "vac", "vebdo", "veendo", "ven", 
                     "vendido", "vene", "vente", "vevta", "garage", "vbiex", 
-                    "virtuoso", "vjvs", "vneta", "zapatos") 
+                    "virtuoso", "vjvs", "vneta", "zapatos", "aapartamento") 
                     
 total_table$title <- lapply(total_table$title, 
                             function(title) removeWords(title, repeated_words))
