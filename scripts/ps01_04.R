@@ -14,7 +14,7 @@ rm(list = ls())
 library(pacman)
 library(ggplot2) #estos son necesarios si ya estan en el p_load? 
 library(dplyr)
-p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, rstudioapi, stargazer)
+p_load(rvest, tidyverse, ggplot2, rio, skimr, caret, rstudioapi, stargazer, boot)
 
 # 0.3 Define directories
 path_script <- rstudioapi::getActiveDocumentContext()$path
@@ -63,17 +63,18 @@ skim(geihbog18_filtered)
 # 3. Estimate the conditional wage gap (4B) ------------------------------------
 #' In this section, we will estimate the conditional wage gap which we have 
 #' defined as log(w) = β1 + β2Female + β3formal + β4relab + β5college 
-#' + β7oficio + u , where 
+#' + β6age + u , where 
         #' Female is an indicator that takes the value of one if the individual 
         #' in the sample identifies as female.
         #' formal is an indicator that takes the value of one if the individual 
         #' in the sample is a formal worker
-        #'
-        #'
-        #'
+        #' relab is a categorical variable that indicates the type of occupation
+        #' college takes the value of 1 if the individual had terciary education
+        #' age is simply the age of the individual
   
   # 3.1 We first estimate the conditional regression using standard lm
-  standardreg <- lm(ln_wage ~ gender + formal + relab + college + oficio, data 
+  
+  standardreg <- lm(ln_wage ~ gender + formal + relab + college + age, data 
                      = geihbog18_filtered, x = TRUE)
   residuals_sr <- residuals(standardreg)
   
@@ -82,16 +83,15 @@ skim(geihbog18_filtered)
   #'the variables, excluding gender, and store the residuals. Finally, regress 
   #'the residuals of the second regression on the residuals of the first 
   #'regression. (4b.i)
-  geihbog18_filtered<-geihbog18_filtered %>% mutate(genderResidF=lm(gender ~ formal + relab + college + oficio,geihbog18_filtered)$residuals) #Residuals of gender~rest of xi
-  geihbog18_filtered<-geihbog18_filtered %>% mutate(wageResidF=lm(ln_wage ~ formal + relab + college + oficio,geihbog18_filtered)$residuals) #Residuals of gender~rest of xi
+  geihbog18_filtered<-geihbog18_filtered %>% mutate(genderResidF=lm(gender ~ formal + relab + college + age,geihbog18_filtered)$residuals) #Residuals of gender~rest of xi
+  geihbog18_filtered<-geihbog18_filtered %>% mutate(wageResidF=lm(ln_wage ~ formal + relab + college + age,geihbog18_filtered)$residuals) #Residuals of gender~rest of xi
   regFWL<-lm(wageResidF~genderResidF,geihbog18_filtered)
   
   #3.3 We compare the results of the standard regression and the regression 
   #using the FWL theorem. 
   stargazer(standardreg,regFWL,type="text",digits=7)
   
-  #3.4 We take a look at SS residuals and the standard errors, after correcting
-  #the degrees of freedom of the FWL regression.
+  #3.4 We take a look at SS residuals.
   sum(resid(standardreg)^2)
   sum(resid(regFWL)^2)
   
@@ -102,10 +102,10 @@ skim(geihbog18_filtered)
     # Subset the data based on the bootstrap indices
     bootstrap_data <- geihbog18_filtered[indices, ]
     # Estimate the residuals of gender~rest of xi
-    gender_resid <- residuals(lm(gender ~ formal + relab + college + oficio, 
+    gender_resid <- residuals(lm(gender ~ formal + relab + college + age, 
                                  data = bootstrap_data))
     # Estimate the residuals of ln_wage~rest of xi
-    wage_resid <- residuals(lm(ln_wage ~ formal + relab + college + oficio, 
+    wage_resid <- residuals(lm(ln_wage ~ formal + relab + college + age, 
                                data = bootstrap_data))
     # Perform the FWL regression using the residuals
     fwl_model <- lm(wage_resid ~ gender_resid, data = bootstrap_data)
@@ -125,6 +125,7 @@ skim(geihbog18_filtered)
   bias <- boot_results$t
   print(bias)
   std_error <- boot_results$se
+  std_error
   boot_results_df <- data.frame(original = estimated_coefs)
 ?data.frame
   estimated_coefs
@@ -162,7 +163,7 @@ skim(geihbog18_filtered)
     ggtitle("Predicted Age-Wage Profiles by Gender") +
     theme_bw()
   
-  # 4.4 Identify peak age and add to graph
+  # 4.4 Identify peak ages
   max_wage_female <- geihbog18_filtered[geihbog18_filtered$gender == 1, ]
   max_wage_female_age <- max_wage_female$age[which.max(max_wage_female$wage)]
   print(paste("Female Age at Maximum Wage:", max_wage_female_age))
@@ -182,4 +183,4 @@ skim(geihbog18_filtered)
   
 #5.0 Export all regression for analysis########################################
   stargazer(reg4, standardreg, regFWL, model_female, model_male, type="text",digits=7)
-  regression_table <- stargazer(reg4, standardreg, regFWL, model_female, model_male, title = "Unconditional and conditional wage gap regressions results",  align = TRUE, omit.stat = c("ser", "f", "adj.rsq"))
+  regression_table <- stargazer(reg4, standardreg, regFWL, model_female, model_female, title = "Unconditional and conditional wage gap regressions results",  align = TRUE, omit.stat = c( "ser", "f", "adj.rsq"))
