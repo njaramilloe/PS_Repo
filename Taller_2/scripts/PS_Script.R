@@ -19,7 +19,8 @@ p_load(rvest,
        rio, #import/export data file formats
        skimr, #summary data
        stargazer,#generate publication-quality tables
-       expss #functions from spreadsheets and SPSS Statistics software
+       expss, #functions from spreadsheets and SPSS Statistics software
+       plyr #round_any function
 )
 
 # set working directory
@@ -197,12 +198,10 @@ cc_andino
 
 #Calculate the distances from the observations to the Point of Interest
 total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
-
 head(total_table$cc_andino)
 
 #Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
 total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
-
 
 #Call the 93 Park location
 parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
@@ -210,7 +209,6 @@ parque_93
 
 #Calculate the distances from the observations to the Point of Interest
 total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
-
 head(total_table$parque_93)
 
 #Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
@@ -243,16 +241,13 @@ test_data$pred_tree<-predict(tree,test_data)
 
 head(test_data  %>% select(property_id,pred_tree))
 
-#Drop the variable geometry and return Log(prices) into Price
+#Drop the variable geometry, return Log(prices) into Price and round to the nearest 100th
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
 head(test_data  %>% select(property_id,pred_tree))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,pred_tree)
-submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v3.csv",row.names=FALSE)
-
-
 
 # V4 - Predicting prices with Andino, Park 93, bathrooms and property_type cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
@@ -325,140 +320,6 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v4.csv",row.names=FALSE)
 
-
-# V6 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
-#Call the Centro Comercial Andino location
-cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
-cc_andino
-
-#Calculate the distances from the observations to the Point of Interest
-total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
-
-head(total_table$cc_andino)
-
-#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
-total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
-
-#Call the 93 Park location
-parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
-parque_93
-
-#Calculate the distances from the observations to the Point of Interest
-total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
-
-head(total_table$parque_93)
-
-#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
-total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
-
-#Change NAs in Bathroom to 0
-sum(is.na(total_table$bathrooms))
-filas_con_na <- is.na(total_table$bathrooms)
-total_table[filas_con_na,]%>%
-  view()
-total_table$bathrooms[is.na(total_table$bathrooms)] <- 0
-
-colSums(is.na(total_table))
-
-#Divide the total data to keep only the wanted training data variables
-train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, bedrooms, bathrooms, property_type)  %>% na.omit()
-
-#Spatial Blocks
-block_folds <- spatial_block_cv(total_table, v = 5) #5 folds
-autoplot(block_folds)
-
-#Train the model with Log(price)
-set.seed(123)
-tree <- train(
-  log(price) ~ cc_andino + parque_93 + bedrooms + bathrooms,
-  data = train_data,
-  method = "rpart",
-  trControl = block_folds,
-  metric = "MAE",
-  tuneLength = 300 #300 valores del alfa - cost complexity parameter
-)
-
-#Construct the test data frame
-test_data<-total_table  %>% filter(sample=="test")  
-
-#Predict the tree with test data
-test_data$pred_tree<-predict(tree,test_data)
-
-head(test_data %>% select(property_id,pred_tree))
-
-#Drop the variable geometry and return Log(prices) into Price
-test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-head(test_data  %>% select(property_id,pred_tree))
-
-#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-test_data  %>% select(property_id,pred_tree)
-submit <- submit  %>% rename(price=pred_tree)
-write.csv(submit,"Tree_v4.csv",row.names=FALSE)
-
-
-
-#Call the Centro Comercial Andino location
-cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
-cc_andino
-
-#Calculate the distances from the observations to the Point of Interest
-total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
-
-head(total_table$cc_andino)
-
-#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
-total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
-
-#Divide the total data to keep only the wanted training data variables
-train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino,bedrooms)  %>% na.omit()
-
-#Spatial Blocks
-block_folds <- spatial_block_cv(total_table, v = 5) #5 folds
-autoplot(block_folds)
-
-#Train the model with Log(price)
-set.seed(123)
-tree <- train(
-  log(price) ~ cc_andino + bedrooms ,
-  data = train_data,
-  method = "rpart",
-  trControl = block_folds,
-  metric = "MAE",
-  tuneLength = 300 #300 valores del alfa - cost complexity parameter
-)
-
-#Construct the test data frame
-test_data<-total_table  %>% filter(sample=="test")  
-
-#Predict the tree with test data
-test_data$pred_tree<-predict(tree,test_data)
-
-head(test_data  %>% select(property_id,pred_tree))
-
-#Drop the variable geometry and return Log(prices) into Price
-test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-head(test_data  %>% select(property_id,pred_tree))
-
-#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-test_data  %>% select(property_id,pred_tree)
-submit <- submit  %>% rename(price=pred_tree)
-write.csv(submit,"Tree_v6.csv",row.names=FALSE)
-
-
-
-
-
-
-
-
-#####HAY QUE GENERAR LAS  LOCALIDADES COMO PENTAGONOS
-#Spatial Leave Location Out Cross Validation (LLOCV) 
-location_folds <-
-  spatial_leave_location_out_cv(
-    train_data,
-    group = Neighborhood
-  )
-autoplot(location_folds)
 
 # V5 - Predicting prices with Andino, Park 93 and other parks in Chapinero cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
@@ -641,7 +502,7 @@ write.csv(submit,"Tree_v6.csv",row.names=FALSE)
 
 
 
-# V7 - Predicting prices with Andino, Park 93 and Park El Virrey cross-validation --------------------------------------------------------------------------------------------------------------
+# V7 - Predicting prices with Andino, Park 93 and Park El Virrey rounding, cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
 cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
 cc_andino
@@ -709,12 +570,139 @@ head(test_data  %>% select(property_id,pred_tree))
 
 #Drop the variable geometry and return Log(prices) into Price
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v7.csv",row.names=FALSE)
+
+
+
+# V8 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
+#Call the Centro Comercial Andino location
+cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
+cc_andino
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
+
+head(total_table$cc_andino)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
+
+#Call the 93 Park location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+#Call the Park El Virrey location
+parque_el_virrey <- geocode_OSM("Parque El Virrey, Bogotá", as.sf=T)
+parque_el_virrey
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_el_virrey <- st_distance(x = total_table, y=parque_el_virrey)
+
+head(total_table$parque_el_virrey)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_el_virrey))
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type)  %>% na.omit()
+
+#Spatial Blocks
+block_folds <- spatial_block_cv(total_table, v = 5) #5 folds
+autoplot(block_folds)
+
+fitControl <- trainControl(method = "cv",
+                           index = block_folds)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type,
+  data = train_data,
+  method = "rpart",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
 head(test_data  %>% select(property_id,pred_tree))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
-write.csv(submit,"Tree_v7.csv",row.names=FALSE)
+write.csv(submit,"Tree_v4.csv",row.names=FALSE)
+
+
+
+#Call the Centro Comercial Andino location
+cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
+cc_andino
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
+
+head(total_table$cc_andino)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino,bedrooms)  %>% na.omit()
+
+#Spatial Blocks
+block_folds <- spatial_block_cv(total_table, v = 5) #5 folds
+autoplot(block_folds)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + bedrooms ,
+  data = train_data,
+  method = "rpart",
+  trControl = block_folds,
+  metric = "MAE",
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data  %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v8.csv",row.names=FALSE)
+
 
 
 #Predicting prices via a Linear Model ------------------------------------------------------------------------------------------------------------------------------
