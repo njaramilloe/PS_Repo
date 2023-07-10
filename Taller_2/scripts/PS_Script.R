@@ -9,6 +9,9 @@ p_load(rvest,
        sf, #analyze spacial data
        leaflet, #create interactive web maps and visualizations
        tmaptools, #support spatial data manipulation and analysis
+       rgeos, #to calculate the polygons
+       tmaptools, #to extract information from open streetmaps
+       osmdata, #to extract information from open streetmaps
        caret, #Classification And REgression Training 
        vtable, #output a descriptive variable table
        spatialsample, #spatial resampling
@@ -88,7 +91,7 @@ map<-leaflet() %>%
   addCircles(data=total_table,col=~palette(sample)) #capa casas
 map
 
-## Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
+## V1 - Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
 #Call the Centro Internacional de Bogotá location
 cib <- geocode_OSM("Centro Internacional, Bogotá", as.sf=T)
 cib
@@ -108,7 +111,7 @@ train_data <- total_table  %>% filter(sample=="train")  %>% select(price,DCIB,be
 fitControl<-trainControl(method = "cv",
                          number=5)
 
-#V1 - Predicting prices with a tree ----------------------------------------------------------------------------------------------------------------------------
+#Predicting prices with a tree ----------------------------------------------------------------------------------------------------------------------------
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
@@ -138,7 +141,7 @@ submit <- submit  %>% rename(price=pred_tree)
 submit <- submit  %>% rename(property_id=Property_id)
 write.csv(submit,"Tree_v1.csv",row.names=FALSE)
 
-#V2 - Predicting prices with Andino cross-validation --------------------------------------------------------------------------------------------------------------
+# V2 - Predicting prices with Andino cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
 cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
 cc_andino
@@ -323,10 +326,7 @@ submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v4.csv",row.names=FALSE)
 
 
-
-
-
-#Predicting prices via cross-validation with Andino, bathrooms and property_type --------------------------------------------------------------------------------------------------------------
+# V6 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
 cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
 cc_andino
@@ -339,20 +339,41 @@ head(total_table$cc_andino)
 #Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
 total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
 
-#Divide the total data to keep only the wanted training data variables
-train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino,bedrooms, bathrooms, property_type)  %>% na.omit()
+#Call the 93 Park location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
 
-#Tell caret we want to use cross-validation 5 times 
-fitControl<-trainControl(method = "cv",
-                         number=5)
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+#Change NAs in Bathroom to 0
+sum(is.na(total_table$bathrooms))
+filas_con_na <- is.na(total_table$bathrooms)
+total_table[filas_con_na,]%>%
+  view()
+total_table$bathrooms[is.na(total_table$bathrooms)] <- 0
+
+colSums(is.na(total_table))
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, bedrooms, bathrooms, property_type)  %>% na.omit()
+
+#Spatial Blocks
+block_folds <- spatial_block_cv(total_table, v = 5) #5 folds
+autoplot(block_folds)
 
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
-  log(price) ~ cc_andino + bedrooms + bathrooms + property_type,
+  log(price) ~ cc_andino + parque_93 + bedrooms + bathrooms,
   data = train_data,
   method = "rpart",
-  trControl = fitControl,
+  trControl = block_folds,
   metric = "MAE",
   tuneLength = 300 #300 valores del alfa - cost complexity parameter
 )
@@ -363,7 +384,7 @@ test_data<-total_table  %>% filter(sample=="test")
 #Predict the tree with test data
 test_data$pred_tree<-predict(tree,test_data)
 
-head(test_data  %>% select(property_id,pred_tree))
+head(test_data %>% select(property_id,pred_tree))
 
 #Drop the variable geometry and return Log(prices) into Price
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
@@ -372,14 +393,10 @@ head(test_data  %>% select(property_id,pred_tree))
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
-write.csv(submit,"Tree_v5.csv",row.names=FALSE)
+write.csv(submit,"Tree_v4.csv",row.names=FALSE)
 
 
 
-
-
-
-#Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
 cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
 cc_andino
@@ -442,6 +459,263 @@ location_folds <-
     group = Neighborhood
   )
 autoplot(location_folds)
+
+# V5 - Predicting prices with Andino, Park 93 and other parks in Chapinero cross-validation --------------------------------------------------------------------------------------------------------------
+#Call the Centro Comercial Andino location
+cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
+cc_andino
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
+
+head(total_table$cc_andino)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
+
+
+#Call the 93 Park location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+
+#Get information from parks in Chapinero, Bogotá
+# ?available_tags()
+available_tags("leisure")
+parques <- opq(bbox = getbb("UPZs Localidad Chapinero")) %>%
+  add_osm_feature(key = "leisure", value = "park")
+
+#Convert to sf format
+parques <- osmdata_sf(parques)
+
+#Extract polygons
+parques_geometria <- parques$osm_polygons %>%
+  select(osm_id, name)
+
+#Visualize parks
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data=parques_geometria, col = "green", opacity = 0.8, popup = parques_geometria$name)
+
+#Distance from the properties to the nearest park
+centroides <- gCentroid(as(parques_geometria$geometry, "Spatial"), byid = T)
+centroides <- st_as_sf(centroides, coords = c("x","y"))
+
+dist_matrix <- st_distance(x=total_table, y=centroides) #Distance matrix
+dim(dist_matrix) #dimensions. In the columns parks, and in the rows the properties
+
+total_table$min_distance_parks <- apply(dist_matrix, 1, min) #min distance
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, min_distance_parks, bedrooms)  %>% na.omit()
+
+#Tell caret we want to use cross-validation 5 times
+fitControl<-trainControl(method = "cv",
+                         number=5)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + parque_93 + min_distance_parks + bedrooms ,
+  data = train_data,
+  method = "rpart",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data  %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+head(test_data  %>% select(property_id,pred_tree))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,pred_tree)
+submit <- submit  %>% rename(price=pred_tree)
+write.csv(submit,"Tree_v5.csv",row.names=FALSE)
+
+
+# V6 - Predicting prices with Andino, Park 93 and SuperMarkets cross-validation --------------------------------------------------------------------------------------------------------------
+#Call the Centro Comercial Andino location
+cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
+cc_andino
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
+
+head(total_table$cc_andino)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
+
+
+#Call the 93 Park location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+
+#Get information from supermarkets in Chapinero, Bogotá
+# ?available_tags()
+available_tags("shop")
+supermarket <- opq(bbox = getbb("UPZs Localidad Chapinero")) %>%
+  add_osm_feature(key = "shop", value = "supermarket")
+
+#Convert to sf format
+supermarket <- osmdata_sf(supermarket)
+
+#Extract polygons
+supermarket_geometria <- supermarket$osm_polygons %>%
+  select(osm_id, name)
+
+#Visualize parks
+leaflet() %>%
+  addTiles() %>%
+  addPolygons(data=supermarket_geometria, col = "red", opacity = 0.8, popup = supermarket_geometria$name)
+
+#Distance from the properties to the nearest park
+centroides <- gCentroid(as(supermarket_geometria$geometry, "Spatial"), byid = T)
+centroides <- st_as_sf(centroides, coords = c("x","y"))
+
+dist_matrix <- st_distance(x=total_table, y=centroides) #Distance matrix
+dim(dist_matrix) #dimensions. In the columns supermarkets, and in the rows the properties
+
+total_table$min_distance_supermarket <- apply(dist_matrix, 1, min) #min distance
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, min_distance_supermarket, bedrooms)  %>% na.omit()
+
+#Tell caret we want to use cross-validation 5 times
+fitControl<-trainControl(method = "cv",
+                         number=5)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + parque_93 + min_distance_supermarket + bedrooms ,
+  data = train_data,
+  method = "rpart",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data  %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+head(test_data  %>% select(property_id,pred_tree))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,pred_tree)
+submit <- submit  %>% rename(price=pred_tree)
+write.csv(submit,"Tree_v6.csv",row.names=FALSE)
+
+
+
+# V7 - Predicting prices with Andino, Park 93 and Park El Virrey cross-validation --------------------------------------------------------------------------------------------------------------
+#Call the Centro Comercial Andino location
+cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
+cc_andino
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
+
+head(total_table$cc_andino)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
+
+
+#Call the Park El Virrey location
+parque_el_virrey <- geocode_OSM("Parque El Virrey, Bogotá", as.sf=T)
+parque_el_virrey
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_el_virrey <- st_distance(x = total_table, y=parque_el_virrey)
+
+head(total_table$parque_el_virrey)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_el_virrey))
+
+
+#Call the Parque 93 location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms)  %>% na.omit()
+
+#Tell caret we want to use cross-validation 5 times
+fitControl<-trainControl(method = "cv",
+                         number=5)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms ,
+  data = train_data,
+  method = "rpart",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data  %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+head(test_data  %>% select(property_id,pred_tree))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,pred_tree)
+submit <- submit  %>% rename(price=pred_tree)
+write.csv(submit,"Tree_v7.csv",row.names=FALSE)
+
 
 #Predicting prices via a Linear Model ------------------------------------------------------------------------------------------------------------------------------
 lm_model<- lm(log(price) ~  DCIB + bedrooms , data = train_data)
