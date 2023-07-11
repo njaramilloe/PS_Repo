@@ -243,11 +243,18 @@ head(test_data  %>% select(property_id,pred_tree))
 
 #Drop the variable geometry, return Log(prices) into Price and round to the nearest 100th
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-head(test_data  %>% select(property_id,pred_tree))
+
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+
+head(test_data  %>% select(property_id,pred_tree, price))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v3_rounding.csv",row.names=FALSE)
+
 submit<-test_data  %>% select(property_id,pred_tree)
 write.csv(submit,"Tree_v3.csv",row.names=FALSE)
+
 
 # V4 - Predicting prices with Andino, Park 93, bathrooms and property_type cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
