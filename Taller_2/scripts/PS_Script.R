@@ -32,21 +32,10 @@ setwd("../stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
-train <- read.csv("train.csv")
+total_table <- read.csv("db_property_bogota.csv")
 
-#Load test data
-test <- read.csv("test.csv")
-
-#Glimpse into the data bases
-head(test)
-head(train)
-
-#Generate new variable that identifies the sample
-test<-test %>% mutate(sample="test")
-train<-train %>% mutate(sample="train")
-
-#Bind together both databases
-total_table<-rbind(test,train)
+#Glimpse into the data base
+head(total_table)
 table(total_table$sample) #test 10286 | train 38644
 
 #Understand the data ----------------------------------------------------------------------------------------------------------------------------
@@ -56,6 +45,7 @@ head(total_table[1:15])
 
 #Check for string inconsistencies
 unique(total_table$property_type)
+unique(total_table$operation_type)
 
 #Check for missing values
 colSums(is.na(total_table))/nrow(total_table)*100 
@@ -67,6 +57,14 @@ variable_levels
 # Identify variables with only one level
 single_level_vars <- names(variable_levels[variable_levels == 1])
 single_level_vars
+
+#Replace missings with mode in bathroom
+Mode <- function(x) {
+ux <- unique(x)
+ux[which.max(tabulate(match(x, ux)))]
+}
+
+total_table$bathrooms[is.na(total_table$bathrooms)] <- Mode(total_table$bathrooms) 
 
 #Vtable statistics
 total_table_selected<- total_table %>% select(property_id, bedrooms, bathrooms, surface_covered)
@@ -288,7 +286,7 @@ sum(is.na(total_table$bathrooms))
 filas_con_na <- is.na(total_table$bathrooms)
 total_table[filas_con_na,]%>%
   view()
-total_table$bathrooms[is.na(total_table$bathrooms)] <- 1 # REVISAR MODA
+total_table$bathrooms[is.na(total_table$bathrooms)] <- 1 
 
 colSums(is.na(total_table))
 
