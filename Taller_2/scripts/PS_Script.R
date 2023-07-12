@@ -216,7 +216,7 @@ total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parqu
 
 
 #Divide the total data to keep only the wanted training data variables
-train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93,bedrooms)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, bedrooms)  %>% na.omit()
 
 #Tell caret we want to use cross-validation 5 times
 fitControl<-trainControl(method = "cv",
@@ -252,8 +252,8 @@ head(test_data  %>% select(property_id,pred_tree, price))
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v3_rounding.csv",row.names=FALSE)
 
-submit<-test_data  %>% select(property_id,pred_tree)
-write.csv(submit,"Tree_v3.csv",row.names=FALSE)
+#submit<-test_data  %>% select(property_id,pred_tree)
+#write.csv(submit,"Tree_v3.csv",row.names=FALSE)
 
 
 # V4 - Predicting prices with Andino, Park 93, bathrooms and property_type cross-validation --------------------------------------------------------------------------------------------------------------
@@ -288,7 +288,7 @@ sum(is.na(total_table$bathrooms))
 filas_con_na <- is.na(total_table$bathrooms)
 total_table[filas_con_na,]%>%
   view()
-total_table$bathrooms[is.na(total_table$bathrooms)] <- 0
+total_table$bathrooms[is.na(total_table$bathrooms)] <- 1 # REVISAR MODA
 
 colSums(is.na(total_table))
 
@@ -414,7 +414,7 @@ head(test_data  %>% select(property_id,pred_tree))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,pred_tree)
-submit <- submit  %>% rename(price=pred_tree)
+submit <- submit  %>% rename(price = pred_tree)
 write.csv(submit,"Tree_v5.csv",row.names=FALSE)
 
 
@@ -586,7 +586,7 @@ write.csv(submit,"Tree_v7.csv",row.names=FALSE)
 
 
 
-# V8 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
+# V9 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
 cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
 cc_andino
