@@ -14,13 +14,15 @@ p_load(stringi, #manipulate string/text data in the cleaning process
        tokenizers, #convert natural language text into tokens
        stopwords, #low value commonly used words cleaning
        SnowballC, #apply stemming to each word reducing them to their root forms
-       wordcloud, #takes words frequencies as input to create a cloud visualization
+       wordcloud, #takes words frequencies to create a cloud visualization
        tidyverse, #data manipulation and visualization
        tm, #text mining and natural language processing task
        rio, #import/export data file formats
        skimr, #summary data
        stargazer, #generate publication-quality tables
-       RColorBrewer #color palettes for thematic maps
+       RColorBrewer, #color palettes for thematic maps
+       xlsx, #read and write format excel files
+       purrr #converts list variables to string
 )
 
 
@@ -29,6 +31,7 @@ path_script <- rstudioapi::getActiveDocumentContext()$path
 path_folder <- dirname(path_script)
 setwd(path_folder)
 setwd("../stores")
+
 
 #----------------------loading data---------------------------------------------
 # load training data
@@ -47,18 +50,17 @@ table(total_table$sample) #test 10286 | train 38644
 
 
 #----------------------data cleaning process------------------------------------
-
-head(total_table$title)
-head(total_table$description)
-
 #' converts non-ASCII-range punctuation, symbols, and latin letters 
 #' in an ASCII-range equivalent
-total_table$title <- stri_trans_general(str = total_table$title, id = "Latin-ASCII")
-total_table$description <- stri_trans_general(str = total_table$description, id = "Latin-ASCII")
+total_table$title <- stri_trans_general(str = total_table$title, 
+                                        id = "Latin-ASCII")
+
+total_table$description <- stri_trans_general(str = total_table$description, 
+                                              id = "Latin-ASCII")
 
 # remove not alphanumeric text or spaces
 total_table$title <- gsub('[^A-Za-z0-9 ]+', ' ', total_table$title)
-total_table$description  <- gsub('[^A-Za-z0-9 ]+', ' ', total_table$description )
+total_table$description  <- gsub('[^A-Za-z0-9 ]+', ' ', total_table$description)
 
 # be sure are lowercase letters
 total_table$title <- tolower(total_table$title)
@@ -75,6 +77,7 @@ total_table$title <- gsub("\\d+", "", total_table$title)
 #  remove leading and trailing whitespace (spaces, tabs, newlines, etc.)
 total_table$title <- trimws(total_table$title)
 total_table$description <- trimws(total_table$description)
+
 
 #-----------------------erase meaningless words---------------------------------
 #' use a list of stopwords from two libraries: tm and stopwords
@@ -110,42 +113,16 @@ total_table$description <- gsub('\\s+', ' ', total_table$description)
 total_table$title <- trimws(total_table$title)
 total_table$description <- trimws(total_table$description)
 
-#---------------------------tokenization----------------------------------------
-#' tokenize both title and description splitting into individual words
-#' each observation has a list of tokens
-total_table$tokens_title <- tokenize_words(total_table$title)
-total_table$tokens_descr <- tokenize_words(total_table$description)
-
-
-#-----------------------stemming words------------------------------------------
-## reduce to its roots each tokenized word
-#total_table$tokens_title <- wordStem(total_table$tokens_title, "spanish")
-#total_table$tokens_descr  <- wordStem(total_table$tokens_descr, "spanish")
-#total_table$tokens_title[1:15]
-#total_table$description[1:10]
-
-#-----------------------words frequencies---------------------------------------
-## make a table with word frequencies
-
-
-frec_title <- total_table$title %>%
-  table() %>%
-  data.frame() %>%
-  rename("Word" = ".") %>%
-  arrange(desc(Freq))
-
-frec_descr <- total_table$tokens_descr %>%
-  table() %>%
-  data.frame() %>%
-  rename("Word" = ".") %>%
-  arrange(desc(Freq))
+# create a variable to analyze attributes
+total_table$title_attribute <- total_table$title
 
 #-----------------------delete repeated words-----------------------------------
-## delete word without added value for the analysis
+## delete words without added value for the analysis
 
 # load the r-script file that contents the list of repeated word identified
 source("../scripts/list_of_repeated_words_in_title.R")
 
+# remove word without added value
 total_table$title <- lapply(total_table$title, 
                             function(title) removeWords(title, repeated_words))
 
@@ -154,28 +131,89 @@ total_table$title <- gsub('\\s+', ' ', total_table$title)
 
 # remove leading and trailing whitespace (spaces, tabs, newlines, etc.)
 total_table$title <- trimws(total_table$title)
+total_table$title_neigbor <- total_table$title
 
-#-----------------------wordcloud graphic---------------------------------------
-## Loading required package: RColorBrewer
-frec_title <- total_table$title %>%
+#---------------------------tokenization----------------------------------------
+#' tokenize both title and description splitting into individual words
+#' each observation has a list of tokens
+total_table$tokens_title_neigbor <- tokenize_words(total_table$title_neigbor)
+total_table$tokens_descr <- tokenize_words(total_table$description)
+
+
+#-----------------------stemming words------------------------------------------
+## reduce to its roots each tokenized word
+#total_table$tokens_title <- wordStem(total_table$tokens_title, "spanish")
+#total_table$tokens_descr  <- wordStem(total_table$tokens_descr, "spanish")
+
+
+#----------------------web-scraping bogota's neighborhood------------------------
+#' in an external RStudio script named "web_scraping_bog_neighborhood.R", the 
+#' code is written to execute a web-scraping process and retrieve Bogota's 
+#' neighborhoods from Wikipedia. At the end, it creates a new variable to store 
+#' all the neighborhoods that match the text from the publications title.
+
+source("../scripts/web_scraping_bog_neighborhood.R")  # web-scrapping process
+
+
+#-----------------------words frequencies---------------------------------------
+## make a table with word frequencies
+
+# using publications title
+frec_title_neigbor <- total_table$title_neigbor %>%
+  table() %>%
+  data.frame() %>%
+  rename("Word" = ".") %>%
+  arrange(desc(Freq))
+
+# using neighborhood that's results from web-scraping matching
+frec_matched_neigbor <- total_table$neighborhood %>%
   table() %>%
   data.frame() %>%
   rename("Word" = ".") %>%
   arrange(desc(Freq))
 
 p_load(xlsx)
-write.xlsx(frec_title, file = "frec_results.xlsx")  
+write.xlsx(frec_title_neigbor, file = "frec_title_results.xlsx")  
+write.xlsx(frec_matched_neigbor, file = "frec_matched_neigbor.xlsx")  
 
-frec_descr <- total_table$tokens_descr %>%
-  table() %>%
-  data.frame() %>%
-  rename("Word" = ".") %>%
-  arrange(desc(Freq))
+
+#-----------------------wordcloud graphic---------------------------------------
+## set a wordclodu for title_neigbor and matched_neigbor
 
 set.seed(666) 
-png(filename = "wordcloud_title.png", width = 1000, height = 1000)
-wordcloud(words = frec_title$Word, freq = frec_title$Freq, scale=c(16,2),
-          min.freq = 1, max.words = 200, random.order=  FALSE, rot.per = 0.35,
-          colors = brewer.pal(8, "Dark2"))
+png(filename = "wordcloud_title_neigbor.png", width = 1000, height = 1000)
+wordcloud(words = frec_title_neigbor$Word, freq = frec_title_neigbor$Freq, 
+          scale=c(16,2), min.freq = 1, max.words = 200, random.order=  FALSE, 
+          rot.per = 0.35, colors = brewer.pal(8, "Dark2"))
+dev.off()
+
+
+set.seed(666) 
+png(filename = "wordcloud_matched_neigbor.png", width = 1000, height = 1000)
+wordcloud(words = frec_title_neigbor$Word, freq = frec_title_neigbor$Freq, 
+          scale=c(16,2), min.freq = 1, max.words = 200, random.order=  FALSE, 
+          rot.per = 0.35, colors = brewer.pal(8, "Dark2"))
 dev.off()
 getwd()
+
+#-----------------------export the data base------------------------------------
+## export a csv data file with the data to run the models
+
+##show the data structure
+str(total_table)
+
+##converts list variables to string variables
+total_table$tokens_title_neigbor <- map_chr(total_table$tokens_title_neigbor, 
+                                            toString)
+total_table$tokens_descr <- map_chr(total_table$tokens_descr 
+                                    , toString)
+
+# Remove the desired columns from the data frame
+total_table <- total_table[, !(names(total_table) %in% 
+                                 c("tokens_title_neigbor", "tokens_descr"))]
+
+## exports the data sets
+write.csv(total_table, file = "db_property_bogota.csv", row.names = FALSE )  
+
+
+
