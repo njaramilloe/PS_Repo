@@ -20,7 +20,8 @@ p_load(rvest,
        skimr, #summary data
        stargazer,#generate publication-quality tables
        expss, #functions from spreadsheets and SPSS Statistics software
-       plyr #round_any function
+       plyr, #round_any function
+       glmnet
 )
 
 # set working directory
@@ -32,7 +33,7 @@ setwd("../stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
-total_table <- read.csv("db_property_bogota.csv")
+total_table <- read.csv("cleandata.csv")
 
 #Glimpse into the data base
 head(total_table)
@@ -58,7 +59,7 @@ variable_levels
 single_level_vars <- names(variable_levels[variable_levels == 1])
 single_level_vars
 
-#Replace missings with mode in bathroom
+#Replace missings with mode in bathroom (25% are missings)
 Mode <- function(x) {
 ux <- unique(x)
 ux[which.max(tabulate(match(x, ux)))]
@@ -67,7 +68,7 @@ ux[which.max(tabulate(match(x, ux)))]
 total_table$bathrooms[is.na(total_table$bathrooms)] <- Mode(total_table$bathrooms) 
 
 #Vtable statistics
-total_table_selected<- total_table %>% select(property_id, bedrooms, bathrooms, surface_covered)
+total_table_selected<- total_table %>% select(property_id, bedrooms, bathrooms, surface_covered, neighborhood)
 sumtable(total_table_selected, out = "return")
 
 #Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
@@ -90,7 +91,14 @@ map<-leaflet() %>%
   addCircles(data=total_table,col=~palette(sample)) #capa casas
 map
 
-## V1 - Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
+
+##Initial view of which variables might be important
+#Predicting prices via a Linear Model
+lm_model<- lm(log(price) ~ bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge, data = total_table)
+summary(lm_model)
+stargazer(lm_model, type = "text")
+
+# V1 - Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
 #Call the Centro Internacional de Bogotá location
 cib <- geocode_OSM("Centro Internacional, Bogotá", as.sf=T)
 cib
@@ -110,7 +118,7 @@ train_data <- total_table  %>% filter(sample=="train")  %>% select(price,DCIB,be
 fitControl<-trainControl(method = "cv",
                          number=5)
 
-#Predicting prices with a tree ----------------------------------------------------------------------------------------------------------------------------
+#Predicting prices with a tree 
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
@@ -241,18 +249,12 @@ head(test_data  %>% select(property_id,pred_tree))
 
 #Drop the variable geometry, return Log(prices) into Price and round to the nearest 100th
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-
-test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
-
-head(test_data  %>% select(property_id,pred_tree, price))
+head(test_data  %>% select(property_id,pred_tree, pred_tree))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-test_data  %>% select(property_id,price)
-write.csv(submit,"Tree_v3_rounding.csv",row.names=FALSE)
-
-#submit<-test_data  %>% select(property_id,pred_tree)
-#write.csv(submit,"Tree_v3.csv",row.names=FALSE)
-
+submit<-test_data  %>% select(property_id,pred_tree)
+submit <- submit  %>% rename(price=pred_tree)
+write.csv(submit,"Tree_v3.csv",row.names=FALSE)
 
 # V4 - Predicting prices with Andino, Park 93, bathrooms and property_type cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
@@ -584,7 +586,144 @@ write.csv(submit,"Tree_v7.csv",row.names=FALSE)
 
 
 
-# V9 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
+# V8 - Tree V3_rounding - Predicting prices with Andino and Park 93 cross-validation rounding ---------------------------------------------------------------------------
+#Call the Centro Comercial Andino location
+cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
+cc_andino
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
+head(total_table$cc_andino)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
+
+#Call the 93 Park location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, bedrooms)  %>% na.omit()
+
+#Tell caret we want to use cross-validation 5 times
+fitControl<-trainControl(method = "cv",
+                         number=5)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + parque_93 + bedrooms ,
+  data = train_data,
+  method = "rpart",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data  %>% select(property_id,pred_tree))
+
+#Drop the variable geometry, return Log(prices) into Price and round to the nearest 100th
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+
+head(test_data  %>% select(property_id,pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v3_rounding.csv",row.names=FALSE)
+
+
+
+# V9 - Predicting prices with Andino, Park 93, Park El Virrey and all dummies, rounding, cross-validation --------------------------------
+#Call the Centro Comercial Andino location
+cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
+cc_andino
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$cc_andino <- st_distance(x = total_table, y=cc_andino)
+
+head(total_table$cc_andino)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
+
+#Call the Park El Virrey location
+parque_el_virrey <- geocode_OSM("Parque El Virrey, Bogotá", as.sf=T)
+parque_el_virrey
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_el_virrey <- st_distance(x = total_table, y=parque_el_virrey)
+
+head(total_table$parque_el_virrey)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_el_virrey))
+
+
+#Call the Parque 93 location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge)  %>% na.omit()
+
+#Tell caret we want to use cross-validation 10 times
+fitControl<-trainControl(method = "cv",
+                         number= 10)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge,
+  data = train_data,
+  method = "rpart",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data  %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v9.csv",row.names=FALSE)
+
+# V10 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
 cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
 cc_andino
@@ -622,25 +761,45 @@ head(total_table$parque_el_virrey)
 total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_el_virrey))
 
 #Divide the total data to keep only the wanted training data variables
-train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, neighborhood)  %>% na.omit()
 
-#Spatial Blocks
-block_folds <- spatial_block_cv(total_table, v = 5) #5 folds
-autoplot(block_folds)
+#Spatial location folds
+set.seed(123)
+
+location_folds_train <- 
+  spatial_leave_location_out_cv(
+    train_data,
+    group = neighborhood
+  )
+
+autoplot(location_folds_train)
+
+folds_train<-list()
+for(i in 1:length(location_folds_train$splits)){
+  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
+}
 
 fitControl <- trainControl(method = "cv",
-                           index = block_folds)
+                           index = folds_train)
+
+#Tell caret we want to use cross-validation 10 times
+#fitControl<-trainControl(method = "cv",
+#                         number= 10)
 
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
-  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type,
+  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge,
   data = train_data,
   method = "rpart",
   trControl = fitControl,
   metric = "MAE",
   tuneLength = 300 #300 valores del alfa - cost complexity parameter
 )
+
+tree
+
+tree$bestTune
 
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
@@ -710,9 +869,6 @@ write.csv(submit,"Tree_v8.csv",row.names=FALSE)
 
 
 
-#Predicting prices via a Linear Model ------------------------------------------------------------------------------------------------------------------------------
-lm_model<- lm(log(price) ~  DCIB + bedrooms , data = train_data)
-summary(lm_model)
-stargazer(lm_model, type = "text")
+
 
 
