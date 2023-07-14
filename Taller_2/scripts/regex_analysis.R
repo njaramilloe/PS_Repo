@@ -264,3 +264,25 @@ sum(1, total_table$lounge)
 summary(total_table$lounge)
 
 print(total_table$description)
+sum(is.na(total_table$rooms))
+ftrooms <- total_table %>% 
+filter(is.na(rooms), grepl("habitaciones|habitacion|alcoba|alcobas", description))
+print(ftrooms)
+
+           
+# Function to convert written numbers to digits
+convert_to_numeric <- function(number) {
+  written_nums <- c("uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez")
+  digit_nums <- 1:10
+  ifelse(tolower(number) %in% written_nums, digit_nums[match(tolower(number), written_nums)], number)
+}
+
+convert_to_numeric(total_table$description)
+
+# Extract and replace the rooms variable based on description
+total_table <- total_table %>%
+  mutate(rooms = str_extract(description, "(?i)(\\d+\\s*(?=habitacion|habitaciones|alcoba|alcobas)|(?<=habitacion|habitaciones|alcoba|alcobas)\\s*\\d+)") %>%
+             str_extract("\\d+") %>% convert_to_numeric())
+
+# Print the modified total_table
+print(total_table)
