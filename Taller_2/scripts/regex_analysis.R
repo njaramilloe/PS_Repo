@@ -215,6 +215,8 @@ total_table <- total_table[, !(names(total_table) %in%
 ## exports the data sets
 write.csv(total_table, file = "db_property_bogota.csv", row.names = FALSE )
 #----------------------- DESCRIPTION ANALYSIS-----------------------------------
+total_table <- read.csv("db_property_bogota.csv")
+
 #'We create dummies for different apartment characteristics to later be used in
 #' the models. The information comes from the variable "description". 
 sum(grepl("bodega|deposito|bodegas|depositos", total_table$description))
@@ -262,6 +264,10 @@ total_table <- total_table %>%
   mutate(lounge = ifelse(grepl("salon privado|salon comunal|salon social|salones privados|salones comunales|salones sociales", total_table$description), 1, 0))
 sum(1, total_table$lounge)
 summary(total_table$lounge)
+
+write.csv(total_table, file = "cleandata.csv", row.names = FALSE)
+
+
 
 print(total_table$description)
 sum(is.na(total_table$rooms))
