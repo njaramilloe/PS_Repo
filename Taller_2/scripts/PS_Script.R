@@ -21,7 +21,8 @@ p_load(rvest,
        stargazer,#generate publication-quality tables
        expss, #functions from spreadsheets and SPSS Statistics software
        plyr, #round_any function
-       glmnet
+       glmnet, #para spatial correlation
+       ranger #para realizar bosques
 )
 
 # set working directory
@@ -782,19 +783,16 @@ for(i in 1:length(location_folds_train$splits)){
 fitControl <- trainControl(method = "cv",
                            index = folds_train)
 
-#Tell caret we want to use cross-validation 10 times
-#fitControl<-trainControl(method = "cv",
-#                         number= 10)
-
 #Train the model with Log(price)
 set.seed(123)
 tree <- train(
   log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge,
   data = train_data,
-  method = "rpart",
+  method = "glmnet",
   trControl = fitControl,
   metric = "MAE",
-  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+  tuneGrid = expand.grid(alpha =seq(0,1,length.out = 20),
+                           lambda = seq(0.001,0.2,length.out = 50))
 )
 
 tree
@@ -811,15 +809,14 @@ head(test_data %>% select(property_id,pred_tree))
 
 #Drop the variable geometry and return Log(prices) into Price
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-head(test_data  %>% select(property_id,pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-test_data  %>% select(property_id,pred_tree)
-submit <- submit  %>% rename(price=pred_tree)
-write.csv(submit,"Tree_v4.csv",row.names=FALSE)
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v10.csv",row.names=FALSE)
 
-
-
+# V11 - Predicting prices via spatial blocks cost complexity prunning --------------------------------------------------------------------------------------------------------------
 #Call the Centro Comercial Andino location
 cc_andino <- geocode_OSM("Centro Comercial Andino, Bogotá", as.sf=T)
 cc_andino
@@ -832,23 +829,71 @@ head(total_table$cc_andino)
 #Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
 total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(cc_andino))
 
-#Divide the total data to keep only the wanted training data variables
-train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino,bedrooms)  %>% na.omit()
+#Call the 93 Park location
+parque_93 <- geocode_OSM("93 Park, Bogotá", as.sf=T)
+parque_93
 
-#Spatial Blocks
-block_folds <- spatial_block_cv(total_table, v = 5) #5 folds
-autoplot(block_folds)
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_93 <- st_distance(x = total_table, y=parque_93)
+
+head(total_table$parque_93)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_93))
+
+#Call the Park El Virrey location
+parque_el_virrey <- geocode_OSM("Parque El Virrey, Bogotá", as.sf=T)
+parque_el_virrey
+
+#Calculate the distances from the observations to the Point of Interest
+total_table$parque_el_virrey <- st_distance(x = total_table, y=parque_el_virrey)
+
+head(total_table$parque_el_virrey)
+
+#Check if effectively the distance between the test observations and  the Interest Point is different from those  in the training observations 
+total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(parque_el_virrey))
+
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, neighborhood)  %>% na.omit()
+
+#Spatial Block Cost Complexity Prunning
+set.seed(123)
+
+location_folds_train <- 
+  spatial_leave_location_out_cv(
+    train_data,
+    group = neighborhood
+  )
+
+autoplot(location_folds_train)
+
+folds_train<-list()
+for(i in 1:length(location_folds_train$splits)){
+  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
+}
+
+fitControl <- trainControl(method = "cv",
+                           index = folds_train)
 
 #Train the model with Log(price)
 set.seed(123)
-tree <- train(
-  log(price) ~ cc_andino + bedrooms ,
+tree_ranger <- train(
+  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge,
   data = train_data,
-  method = "rpart",
-  trControl = block_folds,
+  method = "ranger",
+  trControl = fitControl,
   metric = "MAE",
-  tuneLength = 300 #300 valores del alfa - cost complexity parameter
+  tuneGrid = expand.grid(
+    mtry = 1,  #número de predictores que va a sacar aleatoriamente. En este caso en cada bootstrap saca 1 predictor de la regresión
+    splitrule = "variance", #Regla de partición
+    min.node.size = 5) #Cantidad de observaciones en el nodo. Default 5 para regresiones
 )
+
+?caret
+
+tree_ranger
+
+tree$bestTune
 
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
@@ -856,7 +901,7 @@ test_data<-total_table  %>% filter(sample=="test")
 #Predict the tree with test data
 test_data$pred_tree<-predict(tree,test_data)
 
-head(test_data  %>% select(property_id,pred_tree))
+head(test_data %>% select(property_id,pred_tree))
 
 #Drop the variable geometry and return Log(prices) into Price
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
@@ -865,8 +910,7 @@ head(test_data  %>% select(property_id, pred_tree, price))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,price)
-write.csv(submit,"Tree_v8.csv",row.names=FALSE)
-
+write.csv(submit,"Tree_v11.csv",row.names=FALSE)
 
 
 
