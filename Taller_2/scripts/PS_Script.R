@@ -23,8 +23,15 @@ p_load(rvest,
        plyr, #round_any function
        glmnet, #para spatial correlation
        ranger, #para realizar bosques
-       bst #para realizar bosques con boosting
+       bst, #para realizar bosques con boosting
+       parallel,
+       doParallel,
 )
+
+#Assign Cores
+detectCores() #8
+registerDoParallel(6)
+
 
 # set working directory
 path_script <- rstudioapi::getActiveDocumentContext()$path
@@ -672,6 +679,123 @@ head(test_data  %>% select(property_id, pred_tree, price))
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v10.csv",row.names=FALSE)
+
+# V10.2 - Predicting prices via spatial blocks cross validation with all variables ----------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, 
+                                                                   zona_g, universidad_javeriana, min_distance_supermarket, parque_hippies, parque_el_virrey, parque_93, 
+                                                                   museo_chico, club_el_nogal, cc_andino, neighborhood)  %>% na.omit()
+#Spatial location folds
+set.seed(123)
+
+location_folds_train <- 
+  spatial_leave_location_out_cv(
+    train_data,
+    group = neighborhood
+  )
+
+autoplot(location_folds_train)
+
+folds_train<-list()
+for(i in 1:length(location_folds_train$splits)){
+  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
+}
+
+fitControl <- trainControl(method = "cv",
+                           index = folds_train)
+
+#Train the model with Log(price)
+tree <- train(
+  log(price) ~ bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge + 
+    zona_g + universidad_javeriana + min_distance_supermarket + parque_hippies + parque_el_virrey + parque_93 + museo_chico + 
+    club_el_nogal + cc_andino,
+  data = train_data,
+  method = "glmnet",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneGrid = expand.grid(alpha =seq(0,1,length.out = 20),
+                         lambda = seq(0.001,0.2,length.out = 50))
+)
+
+tree
+
+tree$bestTune
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v10_2.csv",row.names=FALSE)
+
+
+
+
+# V10.3 - Predicting prices via spatial blocks cross-validation with positive variables in a linear model --------------------------------------------------------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, museo_chico, min_distance_supermarket, zona_g, bedrooms, property_type, bathrooms, depot, balcony, penthouse, gym, patio, neighborhood)  %>% na.omit()
+
+#Spatial location folds
+set.seed(123)
+
+location_folds_train <- 
+  spatial_leave_location_out_cv(
+    train_data,
+    group = neighborhood
+  )
+
+autoplot(location_folds_train)
+
+folds_train<-list()
+for(i in 1:length(location_folds_train$splits)){
+  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
+}
+
+fitControl <- trainControl(method = "cv",
+                           index = folds_train)
+
+#Train the model with Log(price)
+set.seed(123)
+tree <- train(
+  log(price) ~ cc_andino + museo_chico + min_distance_supermarket + zona_g + bedrooms + property_type + bathrooms + depot + balcony + penthouse + gym + patio,
+  data = train_data,
+  method = "glmnet",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneGrid = expand.grid(alpha =seq(0,1,length.out = 20),
+                         lambda = seq(0.001,0.2,length.out = 50))
+)
+
+tree
+
+tree$bestTune
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree,test_data)
+
+head(test_data %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v10_3.csv",row.names=FALSE)
 
 # V11 - Predicting prices via spatial blocks cost complexity prunning ramdom forest--------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
