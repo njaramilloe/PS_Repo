@@ -93,6 +93,9 @@ sum <- xtable(sum)
 print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable.tex", floating = FALSE)
 
 
+#Drop anormal values
+
+
 #Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
 #Adjust for spatial dependence
 total_table <- st_as_sf(
