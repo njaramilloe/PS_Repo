@@ -26,6 +26,7 @@ p_load(rvest,
        bst, #para realizar bosques con boosting
        parallel,
        doParallel,
+       xtable, #to export to latex
 )
 
 #Assign Cores
@@ -58,7 +59,14 @@ unique(total_table$property_type)
 unique(total_table$operation_type)
 
 #Check for missing values
-colSums(is.na(total_table))/nrow(total_table)*100 
+missings<-data.frame(colSums(is.na(total_table))/nrow(total_table)*100)
+
+#export to latex
+?xtable
+missings <- xtable(missings, caption = "Percentage of missing values per variable", colnames = c("Variable","Percentage of Missing Values"))
+# Export the table to a LaTeX file
+#file_path <- "/path/to/output/table.tex"  # Specify the desired file path
+print.xtable(missings, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/missings.tex", floating = FALSE)
 
 # Check the levels of each variable
 variable_levels <- sapply(total_table, function(x) length(unique(x)))
