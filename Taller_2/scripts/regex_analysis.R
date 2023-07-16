@@ -103,7 +103,7 @@ total_table$title <- lapply(total_table$title,
 
 total_table$description <- lapply(total_table$description, 
                                   function(description) removeWords(description, 
-                                                                    stopwords))
+                                                                    st_stopwords2))
 
 # remove multiple consecutive whitespace characters
 total_table$title <- gsub('\\s+', ' ', total_table$title)
@@ -115,8 +115,8 @@ total_table$description <- trimws(total_table$description)
 
 # create a variable to analyze attributes
 total_table$title_attribute <- total_table$title
-
-#-----------------------delete repeated words-----------------------------------
+#----------------------- TITLE ANALYSIS-----------------------------------------
+#----------------------- delete repeated words----------------------------------
 ## delete words without added value for the analysis
 
 # load the r-script file that contents the list of repeated word identified
@@ -213,7 +213,82 @@ total_table <- total_table[, !(names(total_table) %in%
                                  c("tokens_title_neigbor", "tokens_descr"))]
 
 ## exports the data sets
-write.csv(total_table, file = "db_property_bogota.csv", row.names = FALSE )  
+write.csv(total_table, file = "db_property_bogota.csv", row.names = FALSE )
+#----------------------- DESCRIPTION ANALYSIS-----------------------------------
+total_table <- read.csv("db_property_bogota.csv")
+
+#'We create dummies for different apartment characteristics to later be used in
+#' the models. The information comes from the variable "description". 
+sum(grepl("bodega|deposito|bodegas|depositos", total_table$description))
+total_table <- total_table %>% 
+  mutate(depot = ifelse(grepl("bodega|deposito|bodegas|depositos", total_table$description), 1, 0))
+sum(1, total_table$depot)
+summary(total_table$depot)
+
+sum(grepl("parqueadero|parqueaderos|garaje|garajes", total_table$description))
+total_table <- total_table %>% 
+  mutate(parking = ifelse(grepl("parqueadero|parqueaderos|garaje|garajes", total_table$description), 1, 0))
+sum(1, total_table$parking)
+summary(total_table$parking)
+
+sum(grepl("balcon|balcones", total_table$description))
+total_table <- total_table %>% 
+  mutate(balcony = ifelse(grepl("balcon|balcones", total_table$description), 1, 0))
+sum(1, total_table$balcony)
+summary(total_table$balcony)
+
+sum(grepl("penhouse|penthouse", total_table$description))
+total_table <- total_table %>% 
+  mutate(penthouse = ifelse(grepl("penhouse|penthouse", total_table$description), 1, 0))
+sum(1, total_table$penthouse)
+summary(total_table$penthouse)
+
+filtered_descriptions <- total_table %>% 
+  filter(grepl("gimnasios", description))
+print(filtered_descriptions)
+
+sum(grepl("gimnasio|gimnasios", total_table$description))
+total_table <- total_table %>% 
+  mutate(gym = ifelse(grepl("gimnasio|gimnasios", total_table$description), 1, 0))
+sum(1, total_table$gym)
+summary(total_table$gym)
+
+sum(grepl("terraza|terrazas|patio|patios", total_table$description))
+total_table <- total_table %>% 
+  mutate(patio = ifelse(grepl("terraza|terrazas|patio|patios", total_table$description), 1, 0))
+sum(1, total_table$patio)
+summary(total_table$patio)
+
+sum(grepl("salon privado|salon comunal|salon social|salones privados|salones comunales|salones sociales", total_table$description))
+total_table <- total_table %>% 
+  mutate(lounge = ifelse(grepl("salon privado|salon comunal|salon social|salones privados|salones comunales|salones sociales", total_table$description), 1, 0))
+sum(1, total_table$lounge)
+summary(total_table$lounge)
+
+write.csv(total_table, file = "cleandata.csv", row.names = FALSE)
 
 
 
+print(total_table$description)
+sum(is.na(total_table$rooms))
+ftrooms <- total_table %>% 
+filter(is.na(rooms), grepl("habitaciones|habitacion|alcoba|alcobas", description))
+print(ftrooms)
+
+           
+# Function to convert written numbers to digits
+convert_to_numeric <- function(number) {
+  written_nums <- c("uno", "dos", "tres", "cuatro", "cinco", "seis", "siete", "ocho", "nueve", "diez")
+  digit_nums <- 1:10
+  ifelse(tolower(number) %in% written_nums, digit_nums[match(tolower(number), written_nums)], number)
+}
+
+convert_to_numeric(total_table$description)
+
+# Extract and replace the rooms variable based on description
+total_table <- total_table %>%
+  mutate(rooms = str_extract(description, "(?i)(\\d+\\s*(?=habitacion|habitaciones|alcoba|alcobas)|(?<=habitacion|habitaciones|alcoba|alcobas)\\s*\\d+)") %>%
+             str_extract("\\d+") %>% convert_to_numeric())
+
+# Print the modified total_table
+print(total_table)
