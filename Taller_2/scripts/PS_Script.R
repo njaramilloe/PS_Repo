@@ -178,7 +178,6 @@ head(total_table$museo_chico)
 total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(museo_chico))
 
 
-
 #Call the Parque de los Hippies location
 parque_hippies <- geocode_OSM("Parque de los Hippies o Sucre, Bogotá", as.sf=T)
 parque_hippies
@@ -794,29 +793,20 @@ write.csv(submit,"Tree_v12.csv",row.names=FALSE)
 
 
 # V13 - Predicting prices via spatial blocks cost complexity prunning boosting --------------------------------------------------------------------------------------------------------------
+p_load(parallel)
+detectCores()
+p_load (doParallel)
+registerDoParallel(5)
 #Divide the total data to keep only the wanted training data variables
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, 
                                                                    zona_g, universidad_javeriana, min_distance_supermarket, parque_hippies, parque_el_virrey, parque_93, 
                                                                    museo_chico, club_el_nogal, cc_andino, neighborhood)  %>% na.omit()
 
-#Spatial Block Cost Complexity Prunning - Bagging
+#Spatial Block Cost Complexity Prunning - Boosting
 set.seed(123)
 
-location_folds_train <- 
-  spatial_leave_location_out_cv(
-    train_data,
-    group = neighborhood
-  )
-
-autoplot(location_folds_train)
-
-folds_train<-list()
-for(i in 1:length(location_folds_train$splits)){
-  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
-}
-
 fitControl <- trainControl(method = "cv",
-                           index = folds_train)
+                           number= 10)
 
 #Train the model with Log(price)
 tree_boosted <- train(
@@ -840,7 +830,7 @@ tree_boosted$bestTune
 test_data<-total_table  %>% filter(sample=="test")  
 
 #Predict the tree with test data
-test_data$pred_tree<-predict(tree_ranger,test_data)
+test_data$pred_tree<-predict(tree_boosted,test_data)
 
 head(test_data %>% select(property_id,pred_tree))
 
@@ -852,4 +842,54 @@ head(test_data  %>% select(property_id, pred_tree, price))
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v13.csv",row.names=FALSE)
+
+#MAE y MAPE del train
+MAE(y_pred=tree_boosted, y_true=train_data$log(price))
+?MAE
+#MAE y MAPE del test
+MAE(y_pred=tree_boosted, y_true=)
+
+# V14 - Predicting prices via spatial blocks cost complexity prunning bagging--------------------------------------------------------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, neighborhood)  %>% na.omit()
+
+#Spatial Block Cost Complexity Prunning - Bagging
+set.seed(123)
+
+fitControl <- trainControl(method = "cv",
+                           number = 10)
+
+#Train the model with Log(price)
+tree_ranger <- train(
+  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge,
+  data = train_data,
+  method = "ranger",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneGrid = expand.grid(
+    mtry = c(1,2,3),  #número de predictores que va a sacar aleatoriamente. En este caso en cada bootstrap saca 1 predictor de la regresión
+    splitrule = "variance", #Regla de partición
+    min.node.size = c(5,10,15)) #Cantidad de observaciones en el nodo. Default 5 para regresiones
+)
+
+tree_ranger
+
+tree_ranger$bestTune
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree_ranger,test_data)
+
+head(test_data %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v14.csv",row.names=FALSE)
 
