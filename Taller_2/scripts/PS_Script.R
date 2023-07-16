@@ -1,6 +1,8 @@
 rm(list = ls())
 
 library(pacman)
+library(knitr)
+library(kableExtra)
 
 p_load(rvest, 
        tidyverse, #data manipulation and visualization
@@ -43,7 +45,7 @@ setwd("../stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
-total_table <- read.csv("cleandata.csv")
+total_table <- read.csv("db_property_merged.csv")
 
 #Glimpse into the data base
 head(total_table)
@@ -899,7 +901,7 @@ tree_ranger <- train(
 tree_ranger
 
 tree_ranger$bestTune
-dim(tree_ranger)
+
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
 
@@ -951,8 +953,7 @@ tree_boosted$bestTune
 
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
-dim(test_data)
-dim(tree_boosted)
+
 #Predict the tree with test data
 test_data$pred_tree<-predict(tree_boosted,test_data)
 
@@ -967,7 +968,11 @@ head(test_data  %>% select(property_id, pred_tree, price))
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v13.csv",row.names=FALSE)
 
-# V14 - Predicting prices via spatial blocks cost complexity prunning bagging--------------------------------------------------------------------------------------------------------------
+#MAE and MAPE test 
+MAE(test_data$pred_tree, test_data$price)
+## MAE V13: 2.569.115
+
+# V14 - Predicting prices via spatial blocks cost complexity prunning bagging---
 #Divide the total data to keep only the wanted training data variables
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, neighborhood)  %>% na.omit()
 
@@ -995,9 +1000,7 @@ tree_ranger
 tree_ranger$bestTune
 
 train_data$pred_tree<-predict(tree_ranger,train_data)
-dim(train_data)
-dim(test_data)
-dim(tree_ranger)
+
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
 
@@ -1021,4 +1024,26 @@ MAPE(train_data$pred_tree, train_data$price)
 
 #MAE and MAPE test 
 MAE(test_data$pred_tree, test_data$price)
+#MAE V14: 2.496.469
 MAPE(train_data$pred_tree, train_data$price)
+
+
+### Model Comparison------------------------------------------------------------
+# Create a dataframe with the model information
+modelcomparison <- data.frame(
+  Model = c("Model 14", "Model 2", "Model 3", "Model 4", "Model 5"),
+  Method = c("Random Forest", "Random Forests", "Bagging", "Boosting", "Other Method"),
+  Variables = c("15", "Var1, Var3", "Var2, Var4", "Var1, Var2, Var3", "Var4"),
+  MAE = c("2.496.469", "8.5", "12.1", "9.8", "11.3")
+)
+
+# Create the chart using ggplot2
+table <- stargazer(modelcomparison, 
+                   title = "Model Comparison", 
+                   column.labels = c("Model", "Method", "Variables", "MAE"),
+                   label = "tab:model_comparison",
+                   align = TRUE,
+                   header = FALSE,
+                   summary = FALSE)
+# Display the chart
+cat(table, sep = "")
