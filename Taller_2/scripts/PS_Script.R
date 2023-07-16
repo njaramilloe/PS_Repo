@@ -65,7 +65,6 @@ missings<-data.frame(colSums(is.na(total_table))/nrow(total_table)*100)
 ?xtable
 missings <- xtable(missings, caption = "Percentage of missing values per variable", colnames = c("Variable","Percentage of Missing Values"))
 # Export the table to a LaTeX file
-#file_path <- "/path/to/output/table.tex"  # Specify the desired file path
 print.xtable(missings, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/missings.tex", floating = FALSE)
 
 # Check the levels of each variable
@@ -85,8 +84,14 @@ ux[which.max(tabulate(match(x, ux)))]
 total_table$bathrooms[is.na(total_table$bathrooms)] <- Mode(total_table$bathrooms) 
 
 #Vtable statistics
-total_table_selected<- total_table %>% select(property_id, bedrooms, bathrooms, surface_covered, neighborhood)
-sumtable(total_table_selected, out = "return")
+total_table_selected<- total_table %>% select(bedrooms, bathrooms, surface_covered, neighborhood, price, neighborhood)
+sum<-data.frame(sumtable(total_table_selected, out = "return"))
+
+#export to latex
+sum <- xtable(sum)
+# Export the table to a LaTeX file
+print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable.tex", floating = FALSE)
+
 
 #Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
 #Adjust for spatial dependence
