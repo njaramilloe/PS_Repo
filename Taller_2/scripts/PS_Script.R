@@ -281,7 +281,7 @@ head(total_table$DCIB)
 total_table %>% st_drop_geometry() %>% group_by(sample) %>% summarize(mean(DCIB))
 
 #Divide the total data to keep only the training data variables Price and Distance to the Interest Point
-train_data <- total_table  %>% filter(sample=="train")  %>% select(price,DCIB,bedrooms)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(property_id, price,DCIB,bedrooms)  %>% na.omit()
 
 #Tell caret we want to use cross-validation 5 times #OJOOOOOO AJUSTAR PARA DATOS ESPACIALES. VER VIDEO ANTERIOR
 fitControl<-trainControl(method = "cv",
@@ -309,12 +309,10 @@ head(test_data  %>% select(property_id,pred_tree))
 
 #Drop the variable geometry and return Log(prices) into Price
 test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-head(test_data  %>% select(Property_id,pred_tree))
+head(test_data  %>% select(property_id,pred_tree))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-test_data  %>% select(Property_id,pred_tree)
-submit <- submit  %>% rename(price=pred_tree)
-submit <- submit  %>% rename(property_id=Property_id)
+submit<-test_data  %>% select(property_id,pred_tree)
 write.csv(submit,"Tree_v1.csv",row.names=FALSE)
 
 # V2 - Predicting prices with Andino cross-validation -------------------------------------------------------------------------------------------------------------
@@ -880,21 +878,8 @@ train_data <- total_table  %>% filter(sample=="train")  %>% select(price, bedroo
 #Spatial Block Cost Complexity Prunning - Bagging
 set.seed(123)
 
-location_folds_train <- 
-  spatial_leave_location_out_cv(
-    train_data,
-    group = neighborhood
-  )
-
-autoplot(location_folds_train)
-
-folds_train<-list()
-for(i in 1:length(location_folds_train$splits)){
-  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
-}
-
 fitControl <- trainControl(method = "cv",
-                           index = folds_train)
+                           number = 10)
 
 #Train the model with Log(price)
 tree_ranger <- train(
@@ -914,7 +899,7 @@ tree_ranger <- train(
 tree_ranger
 
 tree_ranger$bestTune
-
+dim(tree_ranger)
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
 
@@ -942,21 +927,9 @@ train_data <- total_table  %>% filter(sample=="train")  %>% select(price, bedroo
 #Spatial Block Cost Complexity Prunning - Bagging
 set.seed(123)
 
-location_folds_train <- 
-  spatial_leave_location_out_cv(
-    train_data,
-    group = neighborhood
-  )
-
-autoplot(location_folds_train)
-
-folds_train<-list()
-for(i in 1:length(location_folds_train$splits)){
-  folds_train[[i]]<- location_folds_train$splits[[i]]$in_id
-}
 
 fitControl <- trainControl(method = "cv",
-                           index = folds_train)
+                           number = 10)
 
 #Train the model with Log(price)
 tree_boosted <- train(
@@ -978,9 +951,10 @@ tree_boosted$bestTune
 
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
-
+dim(test_data)
+dim(tree_boosted)
 #Predict the tree with test data
-test_data$pred_tree<-predict(tree_ranger,test_data)
+test_data$pred_tree<-predict(tree_boosted,test_data)
 
 head(test_data %>% select(property_id,pred_tree))
 
@@ -1020,6 +994,10 @@ tree_ranger
 
 tree_ranger$bestTune
 
+train_data$pred_tree<-predict(tree_ranger,train_data)
+dim(train_data)
+dim(test_data)
+dim(tree_ranger)
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
 
@@ -1036,3 +1014,11 @@ head(test_data  %>% select(property_id, pred_tree, price))
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v14.csv",row.names=FALSE)
+
+#MAE and MAPE train 
+MAE(train_data$pred_tree, train_data$price)
+MAPE(train_data$pred_tree, train_data$price)
+
+#MAE and MAPE test 
+MAE(test_data$pred_tree, test_data$price)
+MAPE(train_data$pred_tree, train_data$price)
