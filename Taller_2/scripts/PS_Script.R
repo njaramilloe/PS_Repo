@@ -420,13 +420,12 @@ head(test_data  %>% select(property_id,pred_tree, pred_tree))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,pred_tree)
-submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v3.csv",row.names=FALSE)
 
 #MAE
-MAE(test_data$tree, test_data$pred_tree)
-print(MAE)
-print(metric)
+MAE(test_data$pred_tree, test_data$price)
+#MAE V3: 2.653.858
+
 # V4 - Predicting prices with Andino, Park 93, bathrooms and property_type cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, bedrooms, bathrooms, property_type)  %>% na.omit()
@@ -652,6 +651,13 @@ head(test_data  %>% select(property_id,pred_tree, price))
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v3_rounding.csv",row.names=FALSE)
 
+#MAE and MAPE train 
+MAE(train_data$pred_tree, train_data$price)
+
+
+#MAE
+MAE(test_data$pred_tree, test_data$price)
+#MAE V8 - V3_rounding: 3.176.430
 
 
 # V9 - Predicting prices with Andino, Park 93, Park El Virrey and all dummies, rounding, cross-validation --------------------------------
@@ -689,6 +695,11 @@ head(test_data  %>% select(property_id, pred_tree, price))
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v9.csv",row.names=FALSE)
+
+#MAE
+MAE(test_data$pred_tree, test_data$price)
+#MAE V9: 2.653.858
+MAPE(test_data$pred_tree, test_data$price)
 
 # V10 - Predicting prices via spatial blocks cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
@@ -745,6 +756,15 @@ head(test_data  %>% select(property_id, pred_tree, price))
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v10.csv",row.names=FALSE)
+
+#MAE and MAPE train 
+MAE(train_data$pred_tree, train_data$price)
+MAPE(train_data$pred_tree, train_data$price)
+
+#MAE
+MAE(test_data$pred_tree, test_data$price)
+#MAE V10: 2.496.152
+MAPE(test_data$pred_tree, test_data$price)
 
 # V10.2 - Predicting prices via spatial blocks cross validation with all variables ----------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
