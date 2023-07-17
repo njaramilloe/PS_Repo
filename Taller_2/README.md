@@ -10,7 +10,7 @@ This repository contains four (4) folders:
 
 - `stores`: This files contains the data set used to run the machine learning models. The very principal files are test.csv and train.cvs, these files contains the data scrapped from properaty web page, so they are appended. The data files created are: 1) db_property_bogota.cvs, contains parcial results of the regular expressions analysis. 2) db_property_merged.csv is the final data base contaning all the new variables, this is the data base used to run ps_scipt file and predict prices through machine learning models. The files called Tree_v are the prediction results from machine learning models to submit in Kaggle and the dbf, shp, and shx extensions files are spatial data base from IDECA used to collect information about Bogota
 
-- `views`: contains maps, wordclouds, and figures as outputs from the cleaning and prediction proccess. Also contains some table to analyse the word frequencies
+- `views`: contains maps, wordclouds, and figures as outputs from the cleaning and prediction proccess. Also contains some table to analyze the word frequencies
 
 
 
