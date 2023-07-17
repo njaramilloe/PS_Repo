@@ -44,7 +44,7 @@ setwd("../stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
-total_table <- read.csv("cleandata.csv")
+total_table <- read.csv("db_property_merged.csv")
 
 #Glimpse into the data base
 head(total_table)
