@@ -95,23 +95,6 @@ sum <- xtable(sum)
 # Export the table to a LaTeX file
 #print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable.tex", floating = FALSE)
 
-
-#Drop anormal values
-# Create a data frame
-total_table_cleaned <- total_table[total_table$surface_covered < 1206 & total_table$surface_covered >= 30, ]
-rownames(total_table_cleaned) <- NULL
-total_table_cleaned <- total_table_cleaned[complete.cases(total_table_cleaned$property_id), ]
-
-view(total_table_cleaned)
-
-#Vtable statistics
-total_table_cleaned_selected<- total_table_cleaned %>% select(bedrooms, bathrooms, surface_covered, neighborhood, price)
-sum_cleaned<-data.frame(sumtable(total_table_cleaned_selected, out = "return"))
-#export to latex
-sum_cleaned <- xtable(sum_cleaned)
-# Export the table to a LaTeX file
-#print.xtable(sum_cleaned, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable_cleaned.tex", floating = FALSE)
-
 #Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
 #Adjust for spatial dependence
 total_table <- st_as_sf(
@@ -278,12 +261,46 @@ total_table$min_distance_supermarket <- apply(dist_matrix, 1, min) #min distance
 ##Initial view of which variables might be important
 #Predicting prices via a Linear Model
 lm_model<- lm(log(price) ~ bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge + 
-                zona_g + universidad_javeriana + min_distance_supermarket + parque_hippies + parque_el_virrey + parque_93 + museo_chico + club_el_nogal + cc_andino + neighborhood, data = total_table_cleaned)
+                zona_g + universidad_javeriana + min_distance_supermarket + parque_hippies + parque_el_virrey + parque_93 + museo_chico + club_el_nogal + cc_andino + neighborhood, data = total_table)
 summary(lm_model)
 stargazer(lm_model, type = "text")
 
 #'most significant: bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge + 
 #'+ universidad_javeriana + min_distance_supermarket + parque_el_virrey + museo_chico + club_el_nogal + cc_andino + neighborhood
+
+
+##CLEANED DATA
+#Drop anormal values
+# Create a data frame
+total_table_cleaned <- total_table[total_table$surface_covered < 1206 & total_table$surface_covered >= 30, ]
+rownames(total_table_cleaned) <- NULL
+total_table_cleaned <- total_table_cleaned[complete.cases(total_table_cleaned$property_id), ]
+
+view(total_table_cleaned)
+
+
+#Vtable statistics
+total_table_cleaned_selected<- total_table_cleaned %>% select(bedrooms, bathrooms, surface_covered, neighborhood, price)
+sum_cleaned<-data.frame(sumtable(total_table_cleaned_selected, out = "return"))
+#export to latex
+sum_cleaned <- xtable(sum_cleaned)
+# Export the table to a LaTeX file
+print.xtable(sum_cleaned, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable_cleaned.tex", floating = FALSE)
+
+
+#Spatial information
+total_table_cleaned <- st_as_sf(
+  total_table_cleaned, 
+  coords = c("lon","lat"), # "coords" is in x/y order -- so longitude goes first
+  crs = 4326  # Set our coordinate reference system to EPSG:4326,
+  # the standard WGS84 geodetic coordinate reference system
+)
+
+#Interactive visualization
+map_cleaned<-leaflet() %>%
+  addTiles() %>% #capa base
+  addCircles(data=total_table_cleaned,col=~palette(sample)) #capa casas
+map_cleaned
 
 # V1 - Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
 #Call the Centro Internacional de Bogotá location
@@ -1049,7 +1066,6 @@ MAPE(train_data$pred_tree, train_data$price)
 MAE(test_data$pred_tree, test_data$price)
 #MAE V14: 2.496.469
 MAPE(test_data$pred_tree, test_data$price)
-
 
 ### Model Comparison------------------------------------------------------------
 # Create a dataframe with the model information
