@@ -269,7 +269,7 @@ total_table <- total_table %>%
 sum(1, total_table$lounge)
 summary(total_table$lounge)
 
-write.csv(total_table, file = "cleandata.csv", row.names = FALSE)
+#write.csv(total_table, file = "cleandata.csv", row.names = FALSE)
 
 
 
