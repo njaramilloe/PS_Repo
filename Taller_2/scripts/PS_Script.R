@@ -44,14 +44,14 @@ setwd("../stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
-total_table <- read.csv("properties_joined.csv")
-#total_table<- load("merged_data.RData")
+total_table <- read.csv("cleandata.csv")
+
 #Glimpse into the data base
 head(total_table)
 table(total_table$sample) #test 10286 | train 38644
 colnames(total_table) <- tolower(colnames(total_table))
 names(total_table)
-"geometry.1"<-NULL
+
 #Understand the data ----------------------------------------------------------------------------------------------------------------------------
 #DESCRIPTIVE STATISTICS
 glimpse(total_table)
@@ -282,6 +282,9 @@ lm_model<- lm(log(price) ~ bedrooms + property_type + bathrooms + depot + parkin
 summary(lm_model)
 stargazer(lm_model, type = "text")
 
+#'most significant: bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge + 
+#'+ universidad_javeriana + min_distance_supermarket + parque_el_virrey + museo_chico + club_el_nogal + cc_andino + neighborhood
+
 # V1 - Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
 #Call the Centro Internacional de Bogotá location
 cib <- geocode_OSM("Centro Internacional, Bogotá", as.sf=T)
@@ -329,12 +332,6 @@ head(test_data  %>% select(property_id,pred_tree))
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(property_id,pred_tree)
 write.csv(submit,"Tree_v1.csv",row.names=FALSE)
-
-#MAE & MAPE
-MAE(test_data$pred_tree, test_data$price)
-#MAE V14: 2.496.469
-MAPE(test_data$pred_tree, test_data$price)
-
 
 # V2 - Predicting prices with Andino cross-validation -------------------------------------------------------------------------------------------------------------
 #Tell caret we want to use cross-validation 5 times 
@@ -389,6 +386,9 @@ tree <- train(
   tuneLength = 300 #300 valores del alfa - cost complexity parameter
 )
 
+tree
+#CART
+
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
 
@@ -406,6 +406,10 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v3.csv",row.names=FALSE)
 
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+print(MAE)
+print(metric)
 # V4 - Predicting prices with Andino, Park 93, bathrooms and property_type cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, bedrooms, bathrooms, property_type)  %>% na.omit()
