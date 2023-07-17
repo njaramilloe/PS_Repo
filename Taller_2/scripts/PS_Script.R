@@ -1,8 +1,6 @@
 rm(list = ls())
 
 library(pacman)
-library(knitr)
-library(kableExtra)
 
 p_load(rvest, 
        tidyverse, #data manipulation and visualization
@@ -29,6 +27,7 @@ p_load(rvest,
        parallel,
        doParallel,
        xtable, #to export to latex
+       forecast, 
 )
 
 #Assign Cores
@@ -45,11 +44,13 @@ setwd("../stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
-total_table <- read.csv("db_property_merged.csv")
+total_table <- read.csv("cleandata.csv")
 
 #Glimpse into the data base
 head(total_table)
 table(total_table$sample) #test 10286 | train 38644
+colnames(total_table) <- tolower(colnames(total_table))
+names(total_table)
 
 #Understand the data ----------------------------------------------------------------------------------------------------------------------------
 #DESCRIPTIVE STATISTICS
@@ -67,7 +68,7 @@ missings<-data.frame(colSums(is.na(total_table))/nrow(total_table)*100)
 ?xtable
 missings <- xtable(missings, caption = "Percentage of missing values per variable", colnames = c("Variable","Percentage of Missing Values"))
 # Export the table to a LaTeX file
-print.xtable(missings, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/missings.tex", floating = FALSE)
+#print.xtable(missings, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/missings.tex", floating = FALSE)
 
 # Check the levels of each variable
 variable_levels <- sapply(total_table, function(x) length(unique(x)))
@@ -92,11 +93,7 @@ sum<-data.frame(sumtable(total_table_selected, out = "return"))
 #export to latex
 sum <- xtable(sum)
 # Export the table to a LaTeX file
-print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable.tex", floating = FALSE)
-
-
-#Drop anormal values
-
+#print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable.tex", floating = FALSE)
 
 #Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
 #Adjust for spatial dependence
@@ -261,13 +258,49 @@ dim(dist_matrix) #dimensions. In the columns supermarkets, and in the rows the p
 
 total_table$min_distance_supermarket <- apply(dist_matrix, 1, min) #min distance
 
-
 ##Initial view of which variables might be important
 #Predicting prices via a Linear Model
 lm_model<- lm(log(price) ~ bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge + 
-                zona_g + universidad_javeriana + min_distance_supermarket + parque_hippies + parque_el_virrey + parque_93 + museo_chico + club_el_nogal + cc_andino, data = total_table)
+                zona_g + universidad_javeriana + min_distance_supermarket + parque_hippies + parque_el_virrey + parque_93 + museo_chico + club_el_nogal + cc_andino + neighborhood, data = total_table)
 summary(lm_model)
 stargazer(lm_model, type = "text")
+
+#'most significant: bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge + 
+#'+ universidad_javeriana + min_distance_supermarket + parque_el_virrey + museo_chico + club_el_nogal + cc_andino + neighborhood
+
+
+##CLEANED DATA
+#Drop anormal values
+# Create a data frame
+total_table_cleaned <- total_table[total_table$surface_covered < 1206 & total_table$surface_covered >= 30, ]
+rownames(total_table_cleaned) <- NULL
+total_table_cleaned <- total_table_cleaned[complete.cases(total_table_cleaned$property_id), ]
+
+view(total_table_cleaned)
+
+
+#Vtable statistics
+total_table_cleaned_selected<- total_table_cleaned %>% select(bedrooms, bathrooms, surface_covered, neighborhood, price)
+sum_cleaned<-data.frame(sumtable(total_table_cleaned_selected, out = "return"))
+#export to latex
+sum_cleaned <- xtable(sum_cleaned)
+# Export the table to a LaTeX file
+#print.xtable(sum_cleaned, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable_cleaned.tex", floating = FALSE)
+
+
+#Spatial information
+total_table_cleaned <- st_as_sf(
+  total_table_cleaned, 
+  coords = c("lon","lat"), # "coords" is in x/y order -- so longitude goes first
+  crs = 4326  # Set our coordinate reference system to EPSG:4326,
+  # the standard WGS84 geodetic coordinate reference system
+)
+
+#Interactive visualization
+map_cleaned<-leaflet() %>%
+  addTiles() %>% #capa base
+  addCircles(data=total_table_cleaned,col=~palette(sample)) #capa casas
+map_cleaned
 
 # V1 - Distance to Main Interest Points in Bogotá --------------------------------------------------------------------------
 #Call the Centro Internacional de Bogotá location
@@ -370,6 +403,9 @@ tree <- train(
   tuneLength = 300 #300 valores del alfa - cost complexity parameter
 )
 
+tree
+#CART
+
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test")  
 
@@ -387,6 +423,10 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v3.csv",row.names=FALSE)
 
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+print(MAE)
+print(metric)
 # V4 - Predicting prices with Andino, Park 93, bathrooms and property_type cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, bedrooms, bathrooms, property_type)  %>% na.omit()
@@ -423,6 +463,9 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v4.csv",row.names=FALSE)
 
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V4: 
 
 # V5 - Predicting prices with Andino, Park 93 and other parks in Chapinero cross-validation --------------------------------------------------------------------------------------------------------------
 #Get information from parks in Chapinero, Bogotá
@@ -487,6 +530,9 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price = pred_tree)
 write.csv(submit,"Tree_v5.csv",row.names=FALSE)
 
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V5: 
 
 # V6 - Predicting prices with Andino, Park 93 and SuperMarkets cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
@@ -524,7 +570,9 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v6.csv",row.names=FALSE)
 
-
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V6: 
 
 # V7 - Predicting prices with Andino, Park 93 and Park El Virrey rounding, cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
@@ -562,7 +610,9 @@ head(test_data  %>% select(property_id, pred_tree, price))
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v7.csv",row.names=FALSE)
 
-
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V7: 
 
 # V8 - Tree V3_rounding - Predicting prices with Andino and Park 93 cross-validation rounding ---------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
@@ -972,7 +1022,7 @@ write.csv(submit,"Tree_v13.csv",row.names=FALSE)
 MAE(test_data$pred_tree, test_data$price)
 ## MAE V13: 2.569.115
 
-# V14 - Predicting prices via spatial blocks cost complexity prunning bagging---
+# V14 - Predicting prices via spatial blocks cost complexity prunning bagging-------------------------------------------------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
 train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, neighborhood)  %>% na.omit()
 
@@ -1022,11 +1072,10 @@ write.csv(submit,"Tree_v14.csv",row.names=FALSE)
 MAE(train_data$pred_tree, train_data$price)
 MAPE(train_data$pred_tree, train_data$price)
 
-#MAE and MAPE test 
+#MAE
 MAE(test_data$pred_tree, test_data$price)
 #MAE V14: 2.496.469
-MAPE(train_data$pred_tree, train_data$price)
-
+MAPE(test_data$pred_tree, test_data$price)
 
 ### Model Comparison------------------------------------------------------------
 # Create a dataframe with the model information
@@ -1047,3 +1096,5 @@ table <- stargazer(modelcomparison,
                    summary = FALSE)
 # Display the chart
 cat(table, sep = "")
+
+
