@@ -1086,3 +1086,60 @@ table <- stargazer(modelcomparison,
                    summary = FALSE)
 # Display the chart
 cat(table, sep = "")
+
+
+
+# V15 - Predicting prices log - log via spatial blocks cost complexity prunning bagging-------------------------------------------------------------------------------------------------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables
+train_data <- total_table  %>% filter(sample=="train")  %>% select(price,cc_andino, parque_93, parque_el_virrey, bedrooms, property_type, bathrooms, depot, parking, balcony, penthouse, gym, patio, lounge, neighborhood)  %>% na.omit()
+
+#Spatial Block Cost Complexity Prunning - Bagging
+set.seed(123)
+
+fitControl <- trainControl(method = "cv",
+                           number = 10)
+
+#Train the model with Log(price)
+tree_ranger <- train(
+  log(price) ~ cc_andino + parque_93 + parque_el_virrey + bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge,
+  data = train_data,
+  method = "ranger",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneGrid = expand.grid(
+    mtry = c(1,2,3),  #número de predictores que va a sacar aleatoriamente. En este caso en cada bootstrap saca 1 predictor de la regresión
+    splitrule = "variance", #Regla de partición
+    min.node.size = c(5,10,15)) #Cantidad de observaciones en el nodo. Default 5 para regresiones
+)
+
+tree_ranger
+
+tree_ranger$bestTune
+
+train_data$pred_tree<-predict(tree_ranger,train_data)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree_ranger,test_data)
+
+head(test_data %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v14.csv",row.names=FALSE)
+
+#MAE and MAPE train 
+MAE(train_data$pred_tree, train_data$price)
+MAPE(train_data$pred_tree, train_data$price)
+
+#MAE
+MAE(test_data$pred_tree, test_data$price)
+#MAE V14: 2.496.469
+MAPE(test_data$pred_tree, test_data$price)
