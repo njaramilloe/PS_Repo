@@ -2,7 +2,7 @@
 
 This is the repository for the problem set 2 for Big Data and Machine Learning for Applied Economics
 
-This repository contain four (4) folders:
+This repository contains four (4) folders:
 
 - `document`: contains the final document in `pdf` format. This document presents a result of machine learning models applied to Bogota's properties data set scrapped from properaty web page.
  
