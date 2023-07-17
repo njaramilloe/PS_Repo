@@ -285,7 +285,7 @@ sum_cleaned<-data.frame(sumtable(total_table_cleaned_selected, out = "return"))
 #export to latex
 sum_cleaned <- xtable(sum_cleaned)
 # Export the table to a LaTeX file
-print.xtable(sum_cleaned, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable_cleaned.tex", floating = FALSE)
+#print.xtable(sum_cleaned, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable_cleaned.tex", floating = FALSE)
 
 
 #Spatial information
@@ -463,6 +463,9 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v4.csv",row.names=FALSE)
 
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V4: 
 
 # V5 - Predicting prices with Andino, Park 93 and other parks in Chapinero cross-validation --------------------------------------------------------------------------------------------------------------
 #Get information from parks in Chapinero, Bogotá
@@ -527,6 +530,9 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price = pred_tree)
 write.csv(submit,"Tree_v5.csv",row.names=FALSE)
 
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V5: 
 
 # V6 - Predicting prices with Andino, Park 93 and SuperMarkets cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
@@ -564,7 +570,9 @@ submit<-test_data  %>% select(property_id,pred_tree)
 submit <- submit  %>% rename(price=pred_tree)
 write.csv(submit,"Tree_v6.csv",row.names=FALSE)
 
-
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V6: 
 
 # V7 - Predicting prices with Andino, Park 93 and Park El Virrey rounding, cross-validation --------------------------------------------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
@@ -602,7 +610,9 @@ head(test_data  %>% select(property_id, pred_tree, price))
 submit<-test_data  %>% select(property_id,price)
 write.csv(submit,"Tree_v7.csv",row.names=FALSE)
 
-
+#MAE
+MAE(test_data$tree, test_data$pred_tree)
+#MAE V7: 
 
 # V8 - Tree V3_rounding - Predicting prices with Andino and Park 93 cross-validation rounding ---------------------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables
