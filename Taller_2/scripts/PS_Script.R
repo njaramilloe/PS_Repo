@@ -110,7 +110,7 @@ sum_cleaned<-data.frame(sumtable(total_table_cleaned_selected, out = "return"))
 #export to latex
 sum_cleaned <- xtable(sum_cleaned)
 # Export the table to a LaTeX file
-print.xtable(sum_cleaned, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable_cleaned.tex", floating = FALSE)
+#print.xtable(sum_cleaned, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_2/stores/sumtable_cleaned.tex", floating = FALSE)
 
 #Load the total sample as geographical data --------------------------------------------------------------------------------------------------------
 #Adjust for spatial dependence
@@ -278,7 +278,7 @@ total_table$min_distance_supermarket <- apply(dist_matrix, 1, min) #min distance
 ##Initial view of which variables might be important
 #Predicting prices via a Linear Model
 lm_model<- lm(log(price) ~ bedrooms + property_type + bathrooms + depot + parking + balcony + penthouse + gym + patio + lounge + 
-                zona_g + universidad_javeriana + min_distance_supermarket + parque_hippies + parque_el_virrey + parque_93 + museo_chico + club_el_nogal + cc_andino + neighborhood, data = total_table)
+                zona_g + universidad_javeriana + min_distance_supermarket + parque_hippies + parque_el_virrey + parque_93 + museo_chico + club_el_nogal + cc_andino + neighborhood, data = total_table_cleaned)
 summary(lm_model)
 stargazer(lm_model, type = "text")
 
