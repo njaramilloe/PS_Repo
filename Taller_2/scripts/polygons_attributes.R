@@ -36,6 +36,10 @@ properties <- st_as_sf(
   # the standard WGS84 geodetic coordinate reference system
 )
 
+#-------------------------------------------------------------------
+#                     load data from IDECA
+#-------------------------------------------------------------------
+
 #bogota's geographical interesting points:
 points_ngeo <- sf::st_read("ngeo.shp", 
                            promote_to_multi = TRUE)
@@ -98,7 +102,7 @@ class(poly_floors)
 class(points_ngeo)
 
 #-------------------------------------------------------------------------------
-
+#                        verify invalid points
 #-------------------------------------------------------------------------------
 # Check for invalid geometries in properties
 invalid_properties <- properties[!st_is_valid(properties), ]
@@ -172,9 +176,11 @@ variables_to_remove <- c(
 # remove the specified variables
 poly_daiupz <- poly_daiupz[, !names(poly_daiupz) %in% variables_to_remove]
 
-# view cleaned data
-print(poly_daiupz)
+
 #-------------------------------------------------------------------------------
+#                   join the spatial frames
+#-------------------------------------------------------------------------------
+
 ngeo_joined <- st_join( points_ngeo,
                         poly_blocks["ESTRATO"],
                         join = st_intersects,
@@ -232,31 +238,13 @@ nearest_indices <- nearest_feature_indices[, "nn"]
 # Join the attributes from geographic names
 points_data_nearest <- cbind(properties_joined, points_ngeo[nearest_feature_indices, ])
 
-write.csv(properties_joined, file = "properties_joined.csv", row.names = FALSE ) 
+#-------------------------------------------------------------------------------
+#                      export data
+#-------------------------------------------------------------------------------
+
+
+write.csv(merged_data, file = "db_property_merged.csv", row.names = FALSE )
 
 # Save the 'merged_data' dataframe to the RData file
 file_name <- "merged_data.RData"
 save(merged_data, file = file_name)
-
-'cleandata <- read.csv("cleandata.csv")
-
-# Variables to retrieve
-variables_to_retrieve <- c("property_id", "ESTRATO", "SCANOMBRE", "LocNombre", 
-                           "CMIUUPLA", "CMNOMUPLA", "CMH23CONT", "CMLP23CONT", 
-                           "CMHP23CONT", "CMHR23CONT", "CMHA23CONT", 
-                           "CMHB23CONT", "CMHCE23CON", "CMHM23CONT", "CMHC23CONT",
-                           "CMDS23CONT", "CMVI23CONT", "ALTURA"
-)
-
-# Merge the dataframes based on property_id
-merged_data <- merge(cleandata, points_data_nearest[, variables_to_retrieve], 
-                     by = "property_id", all.x = TRUE)
-
-# View the resulting merged data
-view(merged_data)
-
-write.csv(merged_data, file = "db_property_merged.csv", row.names = FALSE ) 
-
-# Save the merged_data dataframe to the RData file
-file_name <- "merged_data.RData"
-save(merged_data, file = file_name)'
