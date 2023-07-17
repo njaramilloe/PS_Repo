@@ -11,6 +11,7 @@ rm(list = ls())
 require("pacman")
 
 p_load(stringi, #manipulate string/text data in the cleaning process
+       stringr, #functions designed to work with strings operations
        tokenizers, #convert natural language text into tokens
        stopwords, #low value commonly used words cleaning
        SnowballC, #apply stemming to each word reducing them to their root forms
@@ -22,7 +23,10 @@ p_load(stringi, #manipulate string/text data in the cleaning process
        stargazer, #generate publication-quality tables
        RColorBrewer, #color palettes for thematic maps
        xlsx, #read and write format excel files
-       purrr #converts list variables to string
+       purrr, #converts list variables to string
+       dplyr, #data manipulation
+       tidytext, #text mining tasks 
+       doParallel #deliver tasks to each of the pc's cores
 )
 
 
@@ -210,7 +214,7 @@ total_table$tokens_descr <- map_chr(total_table$tokens_descr
 
 # Remove the desired columns from the data frame
 total_table <- total_table[, !(names(total_table) %in% 
-                                 c("tokens_title_neigbor", "tokens_descr"))]
+                                c("tokens_title_neigbor", "tokens_descr"))]
 
 ## exports the data sets
 write.csv(total_table, file = "db_property_bogota.csv", row.names = FALSE )
