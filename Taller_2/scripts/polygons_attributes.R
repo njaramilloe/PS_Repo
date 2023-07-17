@@ -234,8 +234,11 @@ points_data_nearest <- cbind(properties_joined, points_ngeo[nearest_feature_indi
 
 write.csv(properties_joined, file = "properties_joined.csv", row.names = FALSE ) 
 
+# Save the 'merged_data' dataframe to the RData file
+file_name <- "merged_data.RData"
+save(merged_data, file = file_name)
 
-cleandata <- read.csv("cleandata.csv")
+'cleandata <- read.csv("cleandata.csv")
 
 # Variables to retrieve
 variables_to_retrieve <- c("property_id", "ESTRATO", "SCANOMBRE", "LocNombre", 
@@ -245,7 +248,7 @@ variables_to_retrieve <- c("property_id", "ESTRATO", "SCANOMBRE", "LocNombre",
                            "CMDS23CONT", "CMVI23CONT", "ALTURA"
 )
 
-# Merge the dataframes based on 'property_id'
+# Merge the dataframes based on property_id
 merged_data <- merge(cleandata, points_data_nearest[, variables_to_retrieve], 
                      by = "property_id", all.x = TRUE)
 
@@ -254,6 +257,6 @@ view(merged_data)
 
 write.csv(merged_data, file = "db_property_merged.csv", row.names = FALSE ) 
 
-# Save the 'merged_data' dataframe to the RData file
+# Save the merged_data dataframe to the RData file
 file_name <- "merged_data.RData"
-save(merged_data, file = file_name)
+save(merged_data, file = file_name)'
