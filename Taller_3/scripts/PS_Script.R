@@ -26,8 +26,22 @@ p_load(stringi, #manipulate string/text data in the cleaning process
        purrr, #converts list variables to string
        dplyr, #data manipulation
        tidytext, #text mining tasks 
-       doParallel #deliver tasks to each of the pc's cores
+       doParallel, #deliver tasks to each of the pc's cores
+       ggplot2, #data visualization
+       expss, #functions from spreadsheets and SPSS Statistics software
+       plyr, #round_any function
+       glmnet, #para spatial correlation
+       ranger, #para realizar bosques
+       bst, #para realizar bosques con boosting
+       parallel,
+       doParallel,
+       xtable, #to export to latex
+       forecast
 )
+
+#Assign Cores
+detectCores() #8
+registerDoParallel(6)
 
 # set working directory
 path_script <- rstudioapi::getActiveDocumentContext()$path
@@ -48,10 +62,82 @@ test_personas <- read.csv("test_personas.csv")
 
 #----------------------merging data---------------------------------------------
 #train data
-train_data <- train_hogares %>%
+train <- train_hogares %>%
   left_join(train_personas, by = c("id"))
 #test data
-test_data <- test_hogares %>%
+test <- test_hogares %>%
   left_join(test_personas, by = c("id"))
 
-#----------------------merging data---------------------------------------------
+#-----------------------export the data base------------------------------------
+#train data
+write.csv(train, file = "train.csv", row.names = FALSE )
+
+#test data
+write.csv(train, file = "test.csv", row.names = FALSE )
+
+#----------------------understanding data---------------------------------------
+#Glimpse into the data bases
+glimpse(test) # Lp : Línea de pobreza
+head(test[1:15])
+
+glimpse(train) # Ingtot : Ingreso Total
+head(train[1:15])
+
+train<-tolower(train)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+? #Generate new variable that identifies the sample
+#test<-test %>% mutate(sample="test")  # test 79 variables
+#train<-train %>% mutate(sample="train")   # train 158 variables
+
+? #Bind together both databases
+#total_table<-rbind(test,train) 
+#table(total_table$sample) #test 10286 | train 38644
+
+#----------------------understanding data---------------------------------------
+#Glimpse into the data base
+head(total_table)
+table(total_table$sample) #test 10286 | train 38644
+colnames(total_table) <- tolower(colnames(total_table))
+names(total_table)
+
+#Check for string inconsistencies
+unique(total_table$property_type)
+
+#Check for missing values
+colSums(is.na(total_table))/nrow(total_table)*100 
+
+# Check the levels of each variable
+variable_levels <- sapply(total_table, function(x) length(unique(x)))
+variable_levels
+
+# Identify variables with only one level
+single_level_vars <- names(variable_levels[variable_levels == 1])
+single_level_vars
+
+#Vtable statistics
+total_table_selected<- total_table %>% select(property_id, bedrooms, bathrooms, surface_covered)
+sumtable(total_table_selected, out = "return")
+
+
+
+
+
+
+
+
