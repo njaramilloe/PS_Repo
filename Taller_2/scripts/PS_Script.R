@@ -44,7 +44,7 @@ setwd("../stores")
 
 #LOAD DATA --------------------------------------------------------------------------------------------------------------------------------------
 #Load training data
-total_table <- read.csv("cleandata.csv")
+total_table <- read.csv("db_property_merged.csv")
 
 #Glimpse into the data base
 head(total_table)
@@ -1100,10 +1100,10 @@ MAPE(test_data$pred_tree, test_data$price)
 ### Model Comparison------------------------------------------------------------
 # Create a dataframe with the model information
 modelcomparison <- data.frame(
-  Model = c("Model 14", "Model 2", "Model 3", "Model 4", "Model 5"),
-  Method = c("Random Forest", "Random Forests", "Bagging", "Boosting", "Other Method"),
-  Variables = c("15", "Var1, Var3", "Var2, Var4", "Var1, Var2, Var3", "Var4"),
-  MAE = c("2.496.469", "8.5", "12.1", "9.8", "11.3")
+  Model = c("Model 14", "Model 10", "Model 9", "Model 3Rounded"),
+  Method = c("Random Forest", "Elastic Net Regularization", "Recursive Partitioning and Regression Tree", "Recursive Partitioning and Regression Tree"),
+  Variables = c("15", "15", "14", "4"),
+  MAE = c("2.496.469", "2.496.152", "2.653.858", "3.176.430")
 )
 
 # Create the chart using ggplot2
