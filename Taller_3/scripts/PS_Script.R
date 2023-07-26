@@ -75,13 +75,6 @@ train <- train_hogares %>%
 test <- test_hogares %>%
   left_join(test_personas, by = c("id"))
 
-#-----------------------export the data base------------------------------------
-#train data
-write.csv(train, file = "train.csv", row.names = FALSE )
-
-#test data
-write.csv(train, file = "test.csv", row.names = FALSE )
-
 #----------------------understanding data---------------------------------------
 #Glimpse into the data bases
 glimpse(test) # Lp : Línea de pobreza
@@ -105,11 +98,8 @@ test_n$Pobre <- NA
 test_n$Indigente <- NA
 test_n$Ingtot <- NA
 
-
 glimpse(test_n) #13 variables
 glimpse(train_n) #13 variables
-
-
 
 #Replace missings with mode in Ingtot (17.57% of observations are missings)
 colSums(is.na(train_n))/nrow(train_n)*100 
@@ -121,14 +111,14 @@ Mode <- function(x) {
 
 train_n$Ingtot[is.na(train_n$Ingtot)] <- Mode(train_n$Ingtot) 
 
-#Normalice database for continuous variables
-numericas_relevantes <- c("P6040", "Ingtot", "Li", "Lp")
+#(?) Normalice database for continuous variables
+#numericas_relevantes <- c("P6040", "Ingtot", "Li", "Lp")
 
-escalador <- preProcess(train_n[, numericas_relevantes],
+#escalador <- preProcess(train_n[, numericas_relevantes],
                         method = c("center","scale"))
 
-train_n[, numericas_relevantes] <- predict(escalador, train_n[, numericas_relevantes])
-test_n[, numericas_relevantes] <- predict(escalador, test_n[, numericas_relevantes])
+#train_n[, numericas_relevantes] <- predict(escalador, train_n[, numericas_relevantes])
+#test_n[, numericas_relevantes] <- predict(escalador, test_n[, numericas_relevantes])
 
 ##Bind both databases together -------------------------------------------------
 #Generate new variable that identifies the sample
@@ -139,6 +129,8 @@ train_n<-train_n %>% mutate(sample="train")
 total_table<-rbind(test_n,train_n)
 table(total_table$sample) #test 219644 | train 543109
 
+#Export the data base
+write.csv(total_table, file = "total_table.csv", row.names = FALSE )
 
 ##Clean the database------------------------------------------------------------
 #Change P6020 = sex from women 2 to 0
@@ -148,7 +140,6 @@ glimpse(total_table)
 #Change Clase.x from 2 to 0 resto
 total_table$Clase.x <- ifelse(total_table$Clase.x == 2, 0, total_table$Clase.x)
 glimpse(total_table) 
-
 
 #Ajustar las variables para que sean factores
 total_table <- total_table %>%  mutate(Clase.x = as.factor(Clase.x),
@@ -175,7 +166,7 @@ names(total_table)
 #Check for missing values
 colSums(is.na(total_table))/nrow(total_table)*100 
 
-# Check the levels of each variable
+#Check the levels of each variable
 variable_levels <- sapply(total_table, function(x) length(unique(x)))
 variable_levels
 
@@ -187,9 +178,119 @@ sum <- xtable(sum)
 # Export the table to a LaTeX file
 #print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_3/stores/sumtable.tex", floating = FALSE)
 
-
 ##Convert to tibble to make it go faster
 total_table <- as.tibble(total_table)
+
+## Modelo 1 Logit --------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables (total income, age, sex)
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
+train_data <- subset(train_data, ingtot != 0)
+colSums(is.na(train_data))/nrow(train_data)*100 
+
+#Logit regression
+set.seed(123)
+
+#Train the model with logit regression
+logit <- train(
+  ingtot ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "glmnet",
+  preProcess = NULL
+)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict total income with logit
+test_data$ingtot <- predict(logit, test_data)
+
+head(test_data %>% select(id,ingtot))
+
+#Construct the dummy variables pobre & indigente
+test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
+
+test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Modelo1.csv",row.names=FALSE)
+
+
+
+
+
+
+
+#Spatial Block Cost Complexity Prunning - Bagging
+fitControl <- trainControl(method = "cv",
+                           number = 10)
+
+#Train the model with ingtot
+tree_ranger <- train(
+  ingtot ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "ranger",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneGrid = expand.grid(
+    mtry = c(1,2,3),  #número de predictores que va a sacar aleatoriamente. En este caso en cada bootstrap saca 1 predictor de la regresión
+    splitrule = "variance", #Regla de partición
+    min.node.size = c(5,10,15)) #Cantidad de observaciones en el nodo. Default 5 para regresiones
+)
+
+tree_ranger
+
+tree_ranger$bestTune
+
+train_data$pred_tree<-predict(tree_ranger,train_data)
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+
+#Predict the tree with test data
+test_data$pred_tree<-predict(tree_ranger,test_data)
+
+head(test_data %>% select(property_id,pred_tree))
+
+#Drop the variable geometry and return Log(prices) into Price
+test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
+test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
+head(test_data  %>% select(property_id, pred_tree, price))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(property_id,price)
+write.csv(submit,"Tree_v14.csv",row.names=FALSE)
+
+#MAE and MAPE train 
+MAE(train_data$pred_tree, train_data$price)
+MAPE(train_data$pred_tree, train_data$price)
+
+#MAE
+MAE(test_data$pred_tree, test_data$price)
+#MAE V14: 2.496.469
+MAPE(test_data$pred_tree, test_data$price)
+
+### Model Comparison------------------------------------------------------------
+# Create a dataframe with the model information
+modelcomparison <- data.frame(
+  Model = c("Model 14", "Model 10", "Model 9", "Model 3Rounded"),
+  Method = c("Random Forest", "Elastic Net Regularization", "Recursive Partitioning and Regression Tree", "Recursive Partitioning and Regression Tree"),
+  Variables = c("15", "15", "14", "4"),
+  MAE = c("2.496.469", "2.496.152", "2.653.858", "3.176.430")
+)
+
+# Create the chart using ggplot2
+table <- stargazer(modelcomparison, 
+                   title = "Model Comparison", 
+                   column.labels = c("Model", "Method", "Variables", "MAE"),
+                   label = "tab:model_comparison",
+                   align = TRUE,
+                   header = FALSE,
+                   summary = FALSE)
+# Display the chart
+cat(table, sep = "")
+
+
 
 
 
