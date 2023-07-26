@@ -62,10 +62,17 @@ setwd("../stores")
 train_hogares <- read.csv("train_hogares.csv")
 #test houses
 test_hogares <- read.csv("test_hogares.csv")
-#training persons
+#training personas
 train_personas <- read.csv("train_personas.csv")
-#test persons
+#test personas
 test_personas <- read.csv("test_personas.csv")
+
+colnames(train_hogares) #La columna id identifica el hogar y orden es la identificación de persona
+colnames(train_personas)[1:2]
+
+#Create variable representing the sum of income of individuals in the household from the test_personas and train_personas databases
+sum_ingresos <- train_personas %>% group_by(id) %>% summarize(Ingtot_hogar=sum(train_personas$Ingtot,na.rm = TRUE)) 
+summary(sum_ingresos)
 
 #----------------------merging data---------------------------------------------
 #train data
