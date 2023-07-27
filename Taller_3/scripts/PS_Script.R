@@ -26,29 +26,30 @@ p_load(stringi, #manipulate string/text data in the cleaning process
        purrr, #converts list variables to string
        dplyr, #data manipulation
        tidytext, #text mining tasks 
-       doParallel, #deliver tasks to each of the pc's cores
        ggplot2, #data visualization
        expss, #functions from spreadsheets and SPSS Statistics software
        plyr, #round_any function
        glmnet, #para spatial correlation
-       ranger, #para realizar bosques
-       bst, #para realizar bosques con boosting
-       parallel,
-       doParallel,
+       ranger, #random forests or recursive partitioning
+       bst, #boosting trees for classification and regression
+       parallel, #support for parallel computation in R
+       doParallel, #deliver tasks to each of the pc's cores
        xtable, #to export to latex
-       forecast,
-       AER,
-       MLmetrics,
-       tidymodels,
-       themis,
-       smotefamily,
-       caret, 
-       vtable
+       forecast, 
+       AER, #applied econometrics wiht R
+       MLmetrics, #evaluation metrics  regression and classification performance
+       tidymodels, #collection of packages for modeling and statistical analysis
+       themis, #extra recipes steps for dealing with unbalanced data
+       smotefamily, #detailed description of what the package does
+       caret, #classification and regression training package
+       vtable #output a descriptive variable table while working with data
 )
 
-#Assign Cores
-detectCores() #8
-registerDoParallel(6)
+# set and register cores to parallel processing
+num_cores <- detectCores() #8
+print(num_cores)
+cl <- makeCluster(num_cores-2) #6
+registerDoParallel(cl) 
 
 # set working directory
 path_script <- rstudioapi::getActiveDocumentContext()$path
@@ -67,12 +68,62 @@ train_personas <- read.csv("train_personas.csv")
 #test personas
 test_personas <- read.csv("test_personas.csv")
 
-colnames(train_hogares) #La columna id identifica el hogar y orden es la identificación de persona
-colnames(train_personas)[1:2]
+#-------collapsing data from individual-level to household-level data-----------
 
-#Create variable representing the sum of income of individuals in the household from the test_personas and train_personas databases
-sum_ingresos <- train_personas %>% group_by(id) %>% summarize(Ingtot_hogar=sum(train_personas$Ingtot,na.rm = TRUE)) 
-summary(sum_ingresos)
+#'calculate aggregated household income using train_personas databases
+# aggregate individual-level data by house id and counting family size
+household_data_train <- train_personas %>%
+  group_by(id) %>%
+  summarize(household_income = sum(Ingtot),
+            total_person = max(Orden))
+
+# calculate household income for each member
+train_personas <- train_personas %>%
+  group_by(id) %>%
+  mutate(total_income = sum(Ingtot)) %>%
+  ungroup() %>%
+  mutate(household_income_participation = Ingtot / total_income)
+
+train_personas$total_income
+train_personas$household_income_participation
+
+# filter the data to include only family members up to number 13
+household_income_df <- train_personas %>%
+  filter(Orden <= 13)
+
+# Plot the average participation of each member of the family (up to 13)
+average_participation_plot <- household_income_df %>%
+  group_by(Orden) %>%
+  summarize(average_participation = mean(household_income_participation, na.rm = TRUE)) %>%
+  ggplot(aes(x = factor(Orden), y = average_participation, fill = factor(Orden))) +
+  geom_bar(stat = "identity", fill = "blue", width = 0.6) +
+  labs(x = "Family Member Order", y = "Average Income Participation") +
+  ggtitle("Average Household Income Participation by Family Member Order (Up to 13)")
+
+print(average_participation_plot)
+
+# plot safe in views file
+ggsave("../views/average_participation.png", plot = average_participation_plot)
+
+#erase the database used to make the graphic
+rm(list = "household_income_df", "average_participation_plot")
+
+#retrieve data from de household head
+family_head_train <- train_personas %>%
+  filter(order == 1) %>%
+  select(id, P6040, P6020, P6040, P6050, P6090, P6100, P6210, P6210s1, P6240, 
+         Oficio, P6426, P6430)
+
+
+#podemos borrar esta parte 
+'colnames(train_hogares) #La columna id identifica el hogar y orden es la identificación de persona
+colnames(train_personas)[1:2]'
+
+'sum_ingresos <- train_personas %>% 
+  group_by(id) %>% 
+  summarize(Ingtot_hogar=sum(train_personas$Ingtot,na.rm = TRUE)) 
+summary(sum_ingresos)'
+
 
 #----------------------merging data---------------------------------------------
 #train data
@@ -297,7 +348,8 @@ table <- stargazer(modelcomparison,
 # Display the chart
 cat(table, sep = "")
 
-
+# stop the cores cluster on parallel processing
+stopCluster(cl)
 
 
 
