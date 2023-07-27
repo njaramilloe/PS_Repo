@@ -112,8 +112,11 @@ rm(list = "household_income_df", "average_participation_plot")
 family_head_train <- train_personas %>%
   filter(order == 1) %>%
   select(id, P6040, P6020, P6040, P6050, P6090, P6100, P6210, P6210s1, P6240, 
-         Oficio, P6426, P6430)
-
+         Oficio, P6426, P6430, P6510, P6545, P6580, P6585s1, P6585s2, P6585s3,
+         P6585s4, P6590, P6600, P6610, P6620, P6630s1, P6630s2, P6630s3, P6630s4,
+         P6630s6, P6800, P6870, P6920, P7040, P7045, P7050, P7090, P7110, P7120,
+         P7150, P7160, P7310, P7350, P7422, P7495, P7500s3, P7505, P7510s1, P7510s2,
+         P7510s3, P7510s5, P7510s6, P7510s7, Pet, Oc, Des, Ina, Depto, Fex_dpto)
 
 #podemos borrar esta parte 
 'colnames(train_hogares) #La columna id identifica el hogar y orden es la identificación de persona
