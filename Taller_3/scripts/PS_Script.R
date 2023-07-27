@@ -91,9 +91,6 @@ train_household <- train_household %>% mutate(Ingtot= (Ingtot / Orden))
 #Round to nearest whole number
 train_household$P6020 <- round(train_household$P6020)
 train_household$P6040 <- round(train_household$P6040)
-train_household$Ingtot <- round(train_household$Ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
-
-
 
 #TEST PERSONAS: Check the number of unique values in 'id' column
 n_distinct(test_personas$id)
@@ -145,14 +142,14 @@ glimpse(test_n) #9 variables
 glimpse(train_n) #9 variables
 
 #Replace missings with mode in Ingtot (17.57% of observations are missings)
-#colSums(is.na(train_n))/nrow(train_n)*100 
+colSums(is.na(train_n))/nrow(train_n)*100 
 
-#Mode <- function(x) {
-#  ux <- unique(x)
-#  ux[which.max(tabulate(match(x, ux)))]
-#}
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 
-#train_n$Ingtot[is.na(train_n$Ingtot)] <- Mode(train_n$Ingtot) 
+train_n$Ingtot[is.na(train_n$Ingtot)] <- Mode(train_n$Ingtot) 
 
 #(?) Normalice database for continuous variables
 #numericas_relevantes <- c("P6040", "Ingtot", "Li", "Lp")
@@ -190,6 +187,11 @@ total_table <- total_table %>%  mutate(Clase = as.factor(Clase),
                                        Pobre = as.factor(Pobre), # Pobre=1 No pobre=0
                                        Indigente = as.factor(Indigente)) # Indigente=1 No indigente=0 
 glimpse(total_table) 
+
+total_table %>%
+  filter(sample == "train") %>%
+  glimpse()
+
 
 #Check for imbalance in Pobre 
 prop.table(table(total_table$Pobre)) #79.98% de la muestra  no es pobre, 20% lo  es
@@ -245,12 +247,14 @@ logit <- train(
 )
 
 #Construct the test data frame
-test_data<-total_table  %>% filter(sample=="test")  
+test_data <- total_table  %>% filter(sample=="test")  
 
 #Predict total income with logit
 test_data$ingtot <- predict(logit, test_data)
 
 head(test_data %>% select(id,ingtot))
+#test_data$ingtot <- round(test_data$ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
+
 
 #Construct the dummy variables pobre & indigente
 test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
@@ -265,9 +269,7 @@ write.csv(submit,"Modelo1.csv",row.names=FALSE)
 
 
 
-
-
-#Spatial Block Cost Complexity Prunning - Bagging
+## Modelo 2 Spatial Block Cost Complexity Prunning - Bagging -------------------
 fitControl <- trainControl(method = "cv",
                            number = 10)
 
