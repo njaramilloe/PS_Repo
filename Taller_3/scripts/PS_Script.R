@@ -69,72 +69,55 @@ train_personas <- read.csv("train_personas.csv")
 test_personas <- read.csv("test_personas.csv")
 
 #-------collapsing data from individual-level to household-level data-----------
+#TRAIN PERSONAS: Check the number of unique values in 'id' column
+n_distinct(train_personas$id)
+n_distinct(train_hogares$id)
 
-#'calculate aggregated household income using train_personas databases
-# aggregate individual-level data by house id and counting family size
-household_data_train <- train_personas %>%
-  group_by(id) %>%
-  summarize(household_income = sum(Ingtot),
-            total_person = max(Orden))
+#TRAIN PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
+train_household_sum <- aggregate(cbind(Ingtot) ~ id, data = train_personas, FUN = sum)
+train_household_mean <- aggregate(cbind(P6040, P6020) ~ id, data = train_personas, FUN = mean)
+train_household_max <- aggregate(cbind(Orden) ~ id, data = train_personas, FUN = max)
 
-# calculate household income for each member
-train_personas <- train_personas %>%
-  group_by(id) %>%
-  mutate(total_income = sum(Ingtot)) %>%
-  ungroup() %>%
-  mutate(household_income_participation = Ingtot / total_income)
+#Bind together
+train_household <- train_household_sum %>%
+  left_join(train_household_mean, by = c("id"))
 
-train_personas$total_income
-train_personas$household_income_participation
+train_household <- train_household %>%
+  left_join(train_household_max, by = c("id"))
 
-# filter the data to include only family members up to number 13
-household_income_df <- train_personas %>%
-  filter(Orden <= 13)
+#Divide Ingtotal household into ingtotal per person to compare to Lp and Li
+train_household <- train_household %>% mutate(Ingtot= (Ingtot / Orden))
 
-# Plot the average participation of each member of the family (up to 13)
-average_participation_plot <- household_income_df %>%
-  group_by(Orden) %>%
-  summarize(average_participation = mean(household_income_participation, na.rm = TRUE)) %>%
-  ggplot(aes(x = factor(Orden), y = average_participation, fill = factor(Orden))) +
-  geom_bar(stat = "identity", fill = "blue", width = 0.6) +
-  labs(x = "Family Member Order", y = "Average Income Participation") +
-  ggtitle("Average Household Income Participation by Family Member Order (Up to 13)")
+#Round to nearest whole number
+train_household$P6020 <- round(train_household$P6020)
+train_household$P6040 <- round(train_household$P6040)
+train_household$Ingtot <- round(train_household$Ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
 
-print(average_participation_plot)
 
-# plot safe in views file
-ggsave("../views/average_participation.png", plot = average_participation_plot)
 
-#erase the database used to make the graphic
-rm(list = "household_income_df", "average_participation_plot")
+#TEST PERSONAS: Check the number of unique values in 'id' column
+n_distinct(test_personas$id)
+n_distinct(test_hogares$id)
 
-#retrieve data from de household head
-family_head_train <- train_personas %>%
-  filter(order == 1) %>%
-  select(id, P6040, P6020, P6040, P6050, P6090, P6100, P6210, P6210s1, P6240, 
-         Oficio, P6426, P6430, P6510, P6545, P6580, P6585s1, P6585s2, P6585s3,
-         P6585s4, P6590, P6600, P6610, P6620, P6630s1, P6630s2, P6630s3, P6630s4,
-         P6630s6, P6800, P6870, P6920, P7040, P7045, P7050, P7090, P7110, P7120,
-         P7150, P7160, P7310, P7350, P7422, P7495, P7500s3, P7505, P7510s1, P7510s2,
-         P7510s3, P7510s5, P7510s6, P7510s7, Pet, Oc, Des, Ina, Depto, Fex_dpto)
+#TEST PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
+test_household_mean <- aggregate(cbind(P6040, P6020) ~ id, data = test_personas, FUN = mean)
+test_household_max <- aggregate(cbind(Orden) ~ id, data = test_personas, FUN = max)
 
-#podemos borrar esta parte 
-'colnames(train_hogares) #La columna id identifica el hogar y orden es la identificación de persona
-colnames(train_personas)[1:2]'
+#Bind together
+test_household <- test_household_mean %>%
+  left_join(test_household_max, by = c("id"))
 
-'sum_ingresos <- train_personas %>% 
-  group_by(id) %>% 
-  summarize(Ingtot_hogar=sum(train_personas$Ingtot,na.rm = TRUE)) 
-summary(sum_ingresos)'
-
+#Round to nearest whole number
+test_household$P6020 <- round(test_household$P6020)
+test_household$P6040 <- round(test_household$P6040)
 
 #----------------------merging data---------------------------------------------
 #train data
 train <- train_hogares %>%
-  left_join(train_personas, by = c("id"))
+  left_join(train_household, by = c("id"))
 #test data
 test <- test_hogares %>%
-  left_join(test_personas, by = c("id"))
+  left_join(test_household, by = c("id"))
 
 #----------------------understanding data---------------------------------------
 #Glimpse into the data bases
@@ -150,27 +133,26 @@ head(train[1:15])
 
 #PRIMER INTENTO-----------------------------------------------------------------
 #Keep only relevant variables
-train_n <- train[, c("id", "Clase.x", "Li", "Lp", "Pobre", "Indigente", "P6020", "P6040", "Pet",
-                     "Oc", "Des", "Ina", "Ingtot")]
-test_n <- test[, c("id", "Clase.x", "Li", "Lp", "P6020", "P6040", "Pet", "Oc", "Des", "Ina")] #Pobre, Indigente, and Ingtot don't exist.
+train_n <- train[, c("id", "Clase", "Li", "Lp", "Pobre", "Indigente", "P6020", "P6040", "Ingtot")] 
+test_n <- test[, c("id", "Clase", "Li", "Lp", "P6020", "P6040")] #Pobre, Indigente, and Ingtot don't exist.
 
 #Create the missing variables in the test database with NA values in all rows of the data frame
 test_n$Pobre <- NA
 test_n$Indigente <- NA
 test_n$Ingtot <- NA
 
-glimpse(test_n) #13 variables
-glimpse(train_n) #13 variables
+glimpse(test_n) #9 variables
+glimpse(train_n) #9 variables
 
 #Replace missings with mode in Ingtot (17.57% of observations are missings)
-colSums(is.na(train_n))/nrow(train_n)*100 
+#colSums(is.na(train_n))/nrow(train_n)*100 
 
-Mode <- function(x) {
-  ux <- unique(x)
-  ux[which.max(tabulate(match(x, ux)))]
-}
+#Mode <- function(x) {
+#  ux <- unique(x)
+#  ux[which.max(tabulate(match(x, ux)))]
+#}
 
-train_n$Ingtot[is.na(train_n$Ingtot)] <- Mode(train_n$Ingtot) 
+#train_n$Ingtot[is.na(train_n$Ingtot)] <- Mode(train_n$Ingtot) 
 
 #(?) Normalice database for continuous variables
 #numericas_relevantes <- c("P6040", "Ingtot", "Li", "Lp")
@@ -188,7 +170,7 @@ train_n<-train_n %>% mutate(sample="train")
 
 #Bind together both databases
 total_table<-rbind(test_n,train_n)
-table(total_table$sample) #test 219644 | train 543109
+table(total_table$sample) #test 66168 | train 164960
 
 #Export the data base
 write.csv(total_table, file = "total_table.csv", row.names = FALSE )
@@ -199,28 +181,24 @@ total_table$P6020 <- ifelse(total_table$P6020 == 2, 0, total_table$P6020)
 glimpse(total_table) 
 
 #Change Clase.x from 2 to 0 resto
-total_table$Clase.x <- ifelse(total_table$Clase.x == 2, 0, total_table$Clase.x)
+total_table$Clase <- ifelse(total_table$Clase == 2, 0, total_table$Clase)
 glimpse(total_table) 
 
 #Ajustar las variables para que sean factores
-total_table <- total_table %>%  mutate(Clase.x = as.factor(Clase.x),
+total_table <- total_table %>%  mutate(Clase = as.factor(Clase),
                                        P6020 = as.factor(P6020), #sexo 1: hombre 0: mujer
-                                       Pet = as.factor(Pet), #Población en edad de trabajar 1: sí 0: no
-                                       Oc = as.factor(Oc), # Ocupado 1: sí
-                                       Des = as.factor(Des), # Desocupado 1: sí
-                                       Ina = as.factor(Ina), # Inactivo 1: sí
                                        Pobre = as.factor(Pobre), # Pobre=1 No pobre=0
                                        Indigente = as.factor(Indigente)) # Indigente=1 No indigente=0 
 glimpse(total_table) 
 
 #Check for imbalance in Pobre 
-prop.table(table(total_table$Pobre)) #74.86% de la muestra  no es pobre, 25.13% lo  es
-#Desbalance no es extremo pues el 25% de la muestra es la clase minoritaria, por lo que se podría decir que hay un desbalance moderado
+prop.table(table(total_table$Pobre)) #79.98% de la muestra  no es pobre, 20% lo  es
+#Desbalance no es extremo pues el 20% de la muestra es la clase minoritaria, por lo que se podría decir que hay un desbalance moderado
 
 #Understanding data-------------------------------------------------------------
 #Glimpse into the data base
 head(total_table)
-table(total_table$sample) #test 219.644 | train 543.109
+table(total_table$sample) #test 66.168 | train 164.960
 colnames(total_table) <- tolower(colnames(total_table))
 names(total_table)
 
@@ -232,7 +210,7 @@ variable_levels <- sapply(total_table, function(x) length(unique(x)))
 variable_levels
 
 #Vtable statistics
-total_table_selected<- total_table %>% select(li, lp, p6020, p6040, pet, oc, des, ina, pobre, indigente, ingtot)
+total_table_selected<- total_table %>% select(li, lp, p6020, p6040, pobre, indigente, ingtot)
 sumtable(total_table_selected, out = "return")
 #export to latex
 sum <- xtable(sum)
@@ -245,8 +223,15 @@ total_table <- as.tibble(total_table)
 ## Modelo 1 Logit --------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
+
+# Calculate the percentage of zeros in the ingtot column
+percentage_zeros <- 100 * mean(train_data$ingtot == 0, na.rm = TRUE)
+print(percentage_zeros) # <1% are zeros. We will drop those observations
+
+#Drop zeros in ingtot
 train_data <- subset(train_data, ingtot != 0)
 colSums(is.na(train_data))/nrow(train_data)*100 
+
 
 #Logit regression
 set.seed(123)
