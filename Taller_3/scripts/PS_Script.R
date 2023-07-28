@@ -257,6 +257,8 @@ test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 submit<-test_data  %>% select(id,pobre)
 write.csv(submit,"Modelo3.csv",row.names=FALSE)
 
+
+
 ## Modelo 2 Ada Boost ----------------------------------------------------------
 
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
