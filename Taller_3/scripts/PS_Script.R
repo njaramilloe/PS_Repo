@@ -42,7 +42,8 @@ p_load(stringi, #manipulate string/text data in the cleaning process
        themis, #extra recipes steps for dealing with unbalanced data
        smotefamily, #detailed description of what the package does
        caret, #classification and regression training package
-       vtable #output a descriptive variable table while working with data
+       vtable, #output a descriptive variable table while working with data
+       adabag #For adaboost
 )
 
 # set and register cores to parallel processing
@@ -262,7 +263,7 @@ write.csv(submit,"Modelo1.csv",row.names=FALSE)
 ## Modelo 2 Ada Boost ----------------------------------------------------------
 
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
-train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
 
 # Calculate the percentage of zeros in the ingtot column
 percentage_zeros <- 100 * mean(train_data$ingtot == 0, na.rm = TRUE)
@@ -272,41 +273,41 @@ print(percentage_zeros) # <1% are zeros. We will drop those observations
 train_data <- subset(train_data, ingtot != 0)
 colSums(is.na(train_data))/nrow(train_data)*100 
 
-#Construct the dummy variables pobre & indigente in train database
-train_data$pobre <- ifelse(train_data$lp > train_data$ingtot, 1, 0)
-
-train_data$indigente <- ifelse(train_data$li > train_data$ingtot, 1, 0)
-
-
-#Logit regression
+#Ada Boost
 set.seed(123)
 
-#Train the model with logit regression
-logit <- train(
-  ingtot ~ p6020 + p6040 + (p6040*p6040),
+#Train the model with ada boost
+ada_boost1 <- train(
+  pobre ~ p6020 + p6040 + (p6040*p6040),
   data = train_data,
-  method = "glmnet",
-  preProcess = NULL
+  method = "AdaBoost.M1",
+  trControl = ctrl,
+  tuneGrid  = expand.grid(
+    mfinal = c(50,100,150), #VER PARAMETROS MAS GRANDES
+    maxdepth = c(1,2,3),
+    coeflearn = c('Breiman', 'Freund'))
 )
+
+ada_boost1
 
 #Construct the test data frame
 test_data <- total_table  %>% filter(sample=="test")  
 
-#Predict total income with logit
-test_data$ingtot <- predict(logit, test_data)
+#Predict poverty with ada boost
+predictTest_ada <- data.frame(
+  obs = test_data$pobre,
+  predict(ada_boost1, newdata = test_data,  type = "prob"),
+  pred = predict(ada_boost1, newdata = test_data, type = "raw"))
 
-head(test_data %>% select(id,ingtot))
-#test_data$ingtot <- round(test_data$ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
+head(test_data %>% select(id,pobre))
 
+#Accuracy
+mean(predictTest_ada$obs == predictTest_ada$pred)
 
-#Construct the dummy variables pobre & indigente
-test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
-
-test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-write.csv(submit,"Modelo3.csv",row.names=FALSE)
+write.csv(submit,"Modelo2.csv",row.names=FALSE)
 
 
 
