@@ -255,7 +255,7 @@ test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-write.csv(submit,"Modelo3.csv",row.names=FALSE)
+write.csv(submit,"Modelo1.csv",row.names=FALSE)
 
 
 
