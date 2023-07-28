@@ -568,7 +568,7 @@ ada_boost2 <- train(
 
 ada_boost2
 
-train_data$pred_ada<-predict(ada_boost2,train_data)
+train_data$pobre<-predict(ada_boost2,train_data)
 
 #Construct the test data frame
 test_data<-total_table  %>% filter(sample=="test") 
@@ -578,21 +578,23 @@ test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("
                                    indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
 
 #Predict the tree with test data
-test_data$ada_boost2<-predict(pred_ada,test_data)
+test_data$pobre<-predict(ada_boost2,test_data)
 
-head(test_data %>% select(id,pred_ada))
+head(test_data %>% select(id,pobre))
 
-#Construct the dummy variables pobre & indigente
-test_data$pobre <- ifelse(test_data$lp > test_data$pred_ada, 1, 0)
+test_data <- test_data %>%
+  mutate(pobre = as.character(pobre)) %>%
+  mutate(pobre = case_when(
+    pobre == "No" ~ "0",
+    pobre == "Si" ~ "1",
+    TRUE ~ pobre  # Keep the original value if it's not "No" or "Si"
+  )) %>%
+  mutate(pobre = as.factor(pobre))
 
-test_data$indigente <- ifelse(test_data$li > test_data$pred_ada, 1, 0)
 
-head(test_data %>% select(id,pred_ada,pobre,indigente)
-     
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-write.csv(submit,"Modelo6.csv",row.names=FALSE)
-     
+write.csv(submit,"Modelo6.1.csv",row.names=FALSE)
 
 
 #Modelo 7: Bosque 1 -------------------------------------------------------------
