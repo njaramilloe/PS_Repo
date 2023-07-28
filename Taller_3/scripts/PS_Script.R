@@ -75,38 +75,39 @@ n_distinct(train_hogares$id)
 
 #TRAIN PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
 train_household_sum <- aggregate(cbind(Ingtot) ~ id, data = train_personas, FUN = sum)
-train_household_mean <- aggregate(cbind(P6040, P6020) ~ id, data = train_personas, FUN = mean)
 train_household_max <- aggregate(cbind(Orden) ~ id, data = train_personas, FUN = max)
+
+family_head_train <- train_personas %>%
+  filter(Orden == 1) %>%
+  select(id, P6020, P6040)
 
 #Bind together
 train_household <- train_household_sum %>%
-  left_join(train_household_mean, by = c("id"))
-
-train_household <- train_household %>%
   left_join(train_household_max, by = c("id"))
 
-#Divide Ingtotal household into ingtotal per person to compare to Lp and Li
-train_household <- train_household %>% mutate(Ingtot= (Ingtot / Orden))
+train_household <- train_household %>%
+  left_join(family_head_train, by = c("id"))
 
-#Round to nearest whole number
-train_household$P6020 <- round(train_household$P6020)
-train_household$P6040 <- round(train_household$P6040)
+
+#Divide Ingtotal household into ingtotal per person to compare to Lp and Li
+train_household <- train_household %>% mutate(Ingtot = (Ingtot / Orden))
+
 
 #TEST PERSONAS: Check the number of unique values in 'id' column
 n_distinct(test_personas$id)
 n_distinct(test_hogares$id)
 
 #TEST PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
-test_household_mean <- aggregate(cbind(P6040, P6020) ~ id, data = test_personas, FUN = mean)
+#test_household_mean <- aggregate(cbind(P6040, P6020) ~ id, data = test_personas, FUN = mean)
 test_household_max <- aggregate(cbind(Orden) ~ id, data = test_personas, FUN = max)
 
-#Bind together
-test_household <- test_household_mean %>%
-  left_join(test_household_max, by = c("id"))
+family_head_test <- test_personas %>%
+  filter(Orden == 1) %>%
+  select(id, P6020, P6040)
 
-#Round to nearest whole number
-test_household$P6020 <- round(test_household$P6020)
-test_household$P6040 <- round(test_household$P6040)
+#Bind together
+test_household <- family_head_test %>%
+  left_join(test_household_max, by = c("id"))
 
 #----------------------merging data---------------------------------------------
 #train data
@@ -151,15 +152,6 @@ Mode <- function(x) {
 
 train_n$Ingtot[is.na(train_n$Ingtot)] <- Mode(train_n$Ingtot) 
 
-#(?) Normalice database for continuous variables
-#numericas_relevantes <- c("P6040", "Ingtot", "Li", "Lp")
-
-#escalador <- preProcess(train_n[, numericas_relevantes],
-                        method = c("center","scale"))
-
-#train_n[, numericas_relevantes] <- predict(escalador, train_n[, numericas_relevantes])
-#test_n[, numericas_relevantes] <- predict(escalador, test_n[, numericas_relevantes])
-
 ##Bind both databases together -------------------------------------------------
 #Generate new variable that identifies the sample
 test_n<-test_n %>% mutate(sample="test")
@@ -177,7 +169,7 @@ write.csv(total_table, file = "total_table.csv", row.names = FALSE )
 total_table$P6020 <- ifelse(total_table$P6020 == 2, 0, total_table$P6020)
 glimpse(total_table) 
 
-#Change Clase.x from 2 to 0 resto
+#Change Clase from 2 to 0 resto
 total_table$Clase <- ifelse(total_table$Clase == 2, 0, total_table$Clase)
 glimpse(total_table) 
 
@@ -263,7 +255,64 @@ test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-write.csv(submit,"Modelo1.csv",row.names=FALSE)
+write.csv(submit,"Modelo3.csv",row.names=FALSE)
+
+## Modelo 2 Ada Boost ----------------------------------------------------------
+
+#Divide the total data to keep only the wanted training data variables (total income, age, sex)
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
+
+# Calculate the percentage of zeros in the ingtot column
+percentage_zeros <- 100 * mean(train_data$ingtot == 0, na.rm = TRUE)
+print(percentage_zeros) # <1% are zeros. We will drop those observations
+
+#Drop zeros in ingtot
+train_data <- subset(train_data, ingtot != 0)
+colSums(is.na(train_data))/nrow(train_data)*100 
+
+#Construct the dummy variables pobre & indigente in train database
+train_data$pobre <- ifelse(train_data$lp > train_data$ingtot, 1, 0)
+
+train_data$indigente <- ifelse(train_data$li > train_data$ingtot, 1, 0)
+
+
+#Logit regression
+set.seed(123)
+
+#Train the model with logit regression
+logit <- train(
+  ingtot ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "glmnet",
+  preProcess = NULL
+)
+
+#Construct the test data frame
+test_data <- total_table  %>% filter(sample=="test")  
+
+#Predict total income with logit
+test_data$ingtot <- predict(logit, test_data)
+
+head(test_data %>% select(id,ingtot))
+#test_data$ingtot <- round(test_data$ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
+
+
+#Construct the dummy variables pobre & indigente
+test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
+
+test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Modelo3.csv",row.names=FALSE)
+
+
+
+
+
+
+
+
 
 
 
