@@ -10,8 +10,8 @@ rm(list = ls())
 #load packages
 require("pacman")
 
-install.packages("rgl")
-install.packages("adabag")
+#install.packages("rgl")
+#install.packages("adabag")
 
 p_load(stringi, #manipulate string/text data in the cleaning process
        stringr, #functions designed to work with strings operations
@@ -85,7 +85,7 @@ train_household_max <- aggregate(cbind(Orden) ~ id, data = train_personas, FUN =
 
 family_head_train <- train_personas %>%
   filter(Orden == 1) %>%
-  select(id, P6020, P6040)
+  select(id, P6020, P6040, P6210)
 
 #Bind together
 train_household <- train_household_sum %>%
@@ -108,7 +108,7 @@ test_household_max <- aggregate(cbind(Orden) ~ id, data = test_personas, FUN = m
 
 family_head_test <- test_personas %>%
   filter(Orden == 1) %>%
-  select(id, P6020, P6040)
+  select(id, P6020, P6040, P6210)
 
 #Bind together
 test_household <- family_head_test %>%
@@ -135,16 +135,27 @@ head(train[1:15])
 #Ingtot : Ingreso Total
 
 #Keep only relevant variables---------------------------------------------------
-train_n <- train[, c("id", "Clase", "Li", "Lp", "Pobre", "Indigente", "P6020", "P6040", "Ingtot")] 
-test_n <- test[, c("id", "Clase", "Li", "Lp", "P6020", "P6040")] #Pobre, Indigente, and Ingtot don't exist.
+train_n <- train[, c("id", "Clase", "Li", "Lp", "Pobre", "Indigente", "P6020", "P6040", "Ingtot", "P5090","Nper", "P6210", "Depto","P5130", "P5140", "P5090", "P5000", "P5010")] 
+
+train_n <- train_n %>%
+  mutate(P5130 = ifelse(is.na(P5130), P5140, P5130)) %>%
+  select(-P5140) %>%
+  select(-P5090.1)
+
+test_n <- test[, c("id", "Clase", "Li", "Lp", "P6020", "P6040", "P5090","Nper", "P6210", "Depto","P5130", "P5140", "P5090", "P5000", "P5010")] #Pobre, Indigente, and Ingtot don't exist.
+
+test_n <- test_n %>%
+  mutate(P5130 = ifelse(is.na(P5130), P5140, P5130)) %>%
+  select(-P5140) %>%
+  select(-P5090.1)
 
 #Create the missing variables in the test database with NA values in all rows of the data frame
 test_n$Pobre <- NA
 test_n$Indigente <- NA
 test_n$Ingtot <- NA
 
-glimpse(test_n) #9 variables
-glimpse(train_n) #9 variables
+glimpse(test_n) #16 variables
+glimpse(train_n) #16 variables
 
 #Replace missings with mode in Ingtot (17.57% of observations are missings)
 colSums(is.na(train_n))/nrow(train_n)*100 
@@ -181,7 +192,13 @@ glimpse(total_table)
 total_table <- total_table %>%  mutate(Clase = as.factor(Clase),
                                        P6020 = as.factor(P6020), #sexo 1: hombre 0: mujer
                                        Pobre = as.factor(Pobre), # Pobre=1 No pobre=0
+                                       P5090 = as.factor(P5090), #a. Propia, totalmente pagada b. Propia, la están pagando c. En arriendo o subarriendo d. En usufructo e. Posesión sin titulo (ocupante f. Otra
+                                       P6210 = as.factor(P6210), #a. Ninguno b. Preescolar c. Básica primaria (1o - 5o) d. Básica secundaria (6o - 9o) e. Media (10o - 13o) f. Superior o universitaria g. No sabe, no informa
+                                       Depto = as.factor(Depto),
+                                       P5000 = as.factor(P5000),
+                                       P5010 = as.factor(P5010),
                                        Indigente = as.factor(Indigente)) # Indigente=1 No indigente=0 
+
 glimpse(total_table) 
 
 total_table %>%
@@ -208,19 +225,32 @@ variable_levels <- sapply(total_table, function(x) length(unique(x)))
 variable_levels
 
 #Vtable statistics
-total_table_selected<- total_table %>% select(li, lp, p6020, p6040, pobre, indigente, ingtot)
+total_table_selected<- total_table %>% select(li, lp, p6020, p6040, pobre, indigente, ingtot, p5090, p6210, p5130, p5000, p5010)
 sumtable(total_table_selected, out = "return")
 #export to latex
-sum <- xtable(sum)
+#sum <- xtable(sum)
 # Export the table to a LaTeX file
 #print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_3/stores/sumtable.tex", floating = FALSE)
+
+#Dummificador
+#dumificador<-dummyVars(formula = ~ . + I(p6040^2) - 1,
+#                       data = total_table, 
+#                       fullRank = T)
+
+#total_table <- predict(dumificador, newdata = total_table)
 
 ##Convert to tibble to make it go faster
 total_table <- as.tibble(total_table)
 
 ## Modelo 1 Logit --------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
-train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(li, lp, p6020, p6040, p5090, nper, p6210, depto, p5130, p5000, p5010, pobre, indigente, ingtot)  %>% na.omit()
+
+variables_numericas <- c("p6040", "p5130", "li", "lp", "ingtot")
+escalador <- preProcess(train_data[, variables_numericas],
+                        method = c("center", "scale"))
+
+train_data[, variables_numericas] <- predict(escalador, train_data[, variables_numericas])
 
 train_data <- train_data  %>% mutate(p6020=factor(p6020,levels=c(0,1),labels=c("Woman","Man")))
 
@@ -232,9 +262,63 @@ print(percentage_zeros) # <1% are zeros. We will drop those observations
 train_data <- subset(train_data, ingtot != 0)
 colSums(is.na(train_data))/nrow(train_data)*100 
 
-
 #Logit regression
 set.seed(123)
+
+modelo6 <- train(
+  x = select(train_data, -pobre),
+  y = as.factor(train_data$pobre),
+  preProcess = NULL,
+  method = "glmnet"
+)
+
+modelo6_imp<-varImp(modelo6)
+modelo6_imp<-rownames_to_column(modelo6_imp$importance, var = "variable")
+
+ggplot(modelo6_imp,  aes(x=Overall, 
+                         y=reorder(variable, Overall)) +
+         geom_col(fill = "darkblue")) 
+         
+y_hat_insample6 <- predict(modelo6, train_data)
+y_hat_outsample6 <- predict(moodelo6, test_data)
+
+#Accuracy
+acc_insample6 <- Accuraccy(y_pred = y_hat_insample6,
+                           y_true = train_data$pobre)
+
+acc_outsample6 <- Accuraccy(y_pred = y_hat_outsample6,
+                           y_true = test_data$pobre)
+
+#Recall
+rec_insample6 <- Recall(y_pred = y_hat_insample6,
+                           y_true = train_data$pobre)
+
+rec_outsample6 <- Recall(y_pred = y_hat_outsample6,
+                            y_true = test_data$pobre)
+
+
+#Precision
+pre_insample6 <- Precision(y_pred = y_hat_insample6,
+                        y_true = train_data$pobre)
+
+pre_outsample6 <- Precision(y_pred = y_hat_outsample6,
+                         y_true = test_data$pobre)
+
+#F1
+f_insample6 <- F1_Score(y_pred = y_hat_insample6,
+                           y_true = train_data$pobre)
+
+f_outsample6 <- F1_Score(y_pred = y_hat_outsample6,
+                            y_true = test_data$pobre)
+
+
+rec_insample6
+rec_outsample6
+pre_insample6
+pre_outsample6
+f_insample6
+f_outsample6
+#----------------------------
 
 #Train the model with logit regression
 logit <- train(
@@ -246,6 +330,8 @@ logit <- train(
 
 #Construct the test data frame
 test_data <- total_table  %>% filter(sample=="test")  
+
+test_data[, variables_numericas] <- predict(escalador, test_data[, variables_numericas])
 
 test_data <- test_data  %>% mutate(p6020=factor(p6020,levels=c(0,1),labels=c("Woman","Man")))
 
@@ -556,7 +642,7 @@ class_levels <- unique(train_data$pobre)
 
 #Train the model with ada boost
 ada_boost2 <- train(
-  pobre ~ p6020 + p6040 + (p6040*p6040),
+  pobre ~ p6020 + p6040 + I(p6040^2),
   data = train_data,
   method = "AdaBoost.M1",
   trControl = ctrl,
