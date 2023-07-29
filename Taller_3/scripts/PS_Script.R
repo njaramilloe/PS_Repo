@@ -266,8 +266,8 @@ colSums(is.na(train_data))/nrow(train_data)*100
 set.seed(123)
 
 modelo6 <- train(
-  x = select(train_data, -pobre),
-  y = as.factor(train_data$pobre),
+  pobre ~ p6020 + p6040 + I(p6040^2) + p5090 + p6210 + depto + p5130 + p5000 + p5010 + ingtot,
+  data = train_data,
   preProcess = NULL,
   method = "glmnet"
 )
@@ -275,18 +275,27 @@ modelo6 <- train(
 modelo6_imp<-varImp(modelo6)
 modelo6_imp<-rownames_to_column(modelo6_imp$importance, var = "variable")
 
-ggplot(modelo6_imp,  aes(x=Overall, 
-                         y=reorder(variable, Overall)) +
-         geom_col(fill = "darkblue")) 
-         
+ggplot(modelo6_imp, aes(x = Overall, y = reorder(variable, Overall))) +
+  geom_col(fill = "darkblue")
+
 y_hat_insample6 <- predict(modelo6, train_data)
-y_hat_outsample6 <- predict(moodelo6, test_data)
+
+#Construct the test data frame
+test_data <- total_table  %>% filter(sample=="test")  
+
+test_data[, variables_numericas] <- predict(escalador, test_data[, variables_numericas])
+
+test_data <- test_data %>% select(li, lp, p6020, p6040, p5090, nper, p6210, depto, p5130, p5000, p5010, pobre, indigente, ingtot) 
+
+#test_data <- test_data  %>% mutate(p6020=factor(p6020,levels=c(0,1),labels=c("Woman","Man")))
+
+y_hat_outsample6 <- predict(modelo6, test_data)
 
 #Accuracy
-acc_insample6 <- Accuraccy(y_pred = y_hat_insample6,
+acc_insample6 <- Accuracy(y_pred = y_hat_insample6,
                            y_true = train_data$pobre)
 
-acc_outsample6 <- Accuraccy(y_pred = y_hat_outsample6,
+acc_outsample6 <- Accuracy(y_pred = y_hat_outsample6,
                            y_true = test_data$pobre)
 
 #Recall
@@ -311,13 +320,90 @@ f_insample6 <- F1_Score(y_pred = y_hat_insample6,
 f_outsample6 <- F1_Score(y_pred = y_hat_outsample6,
                             y_true = test_data$pobre)
 
-
+acc_insample6
+acc_outsample6
 rec_insample6
 rec_outsample6
 pre_insample6
 pre_outsample6
 f_insample6
 f_outsample6
+
+#Predict total income with logit
+test_data$pobre <- predict(modelo6, test_data)
+
+head(test_data %>% select(id,pobre))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Modelo1.csv",row.names=FALSE)
+
+
+#Upsample
+train_data2<-upSample(x=select(train_data, -pobre),
+                      y= as.factor(train_data$pobre),
+                      list = F,
+                      yname = "pobre")
+
+nrow(train_data2) - nrow(train_data)
+prop.table(table(train_data2$pobre))
+
+modelo7 <- train(
+  pobre ~ p6020 + p6040 + I(p6040^2) + p5090 + p6210 + depto + p5130 + p5000 + p5010 + ingtot,
+  data = train_data2,
+  preProcess = NULL,
+  method = "glmnet"
+)
+
+modelo7_imp<-varImp(modelo7)
+modelo7_imp<-rownames_to_column(modelo7_imp$importance, var = "variable")
+
+ggplot(modelo7_imp,  aes(x=Overall, 
+                         y=reorder(variable, Overall)) +
+         geom_col(fill = "darkblue")) 
+
+y_hat_insample7 <- predict(modelo7, train_data2)
+y_hat_outsample7 <- predict(moodelo7, test_data)
+
+#Accuracy
+acc_insample7 <- Accuraccy(y_pred = y_hat_insample7,
+                           y_true = train_data2$pobre)
+
+acc_outsample7 <- Accuraccy(y_pred = y_hat_outsample7,
+                            y_true = test_data$pobre)
+
+#Recall
+rec_insample7 <- Recall(y_pred = y_hat_insample7,
+                        y_true = train_data2$pobre)
+
+rec_outsample7 <- Recall(y_pred = y_hat_outsample7,
+                         y_true = test_data$pobre)
+
+
+#Precision
+pre_insample7 <- Precision(y_pred = y_hat_insample7,
+                           y_true = train_data2$pobre)
+
+pre_outsample7 <- Precision(y_pred = y_hat_outsample7,
+                            y_true = test_data$pobre)
+
+#F1
+f_insample7 <- F1_Score(y_pred = y_hat_insample7,
+                        y_true = train_data2$pobre)
+
+f_outsample7 <- F1_Score(y_pred = y_hat_outsample7,
+                         y_true = test_data$pobre)
+
+
+rec_insample7
+rec_outsample7
+pre_insample7
+pre_outsample7
+f_insample7
+f_outsample7
+
+
+
 #----------------------------
 
 #Train the model with logit regression
