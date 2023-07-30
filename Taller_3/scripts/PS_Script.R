@@ -83,7 +83,7 @@ test_personas <- read.csv("test_personas.csv")
 n_distinct(train_personas$id)
 n_distinct(train_hogares$id)
 
-#TRAIN PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
+#TRAIN PERSONAS: Using the aggregate() function calculate aggregated household income using train_personas databases
 train_household_sum <- aggregate(cbind(Ingtot) ~ id, data = train_personas, FUN = sum)
 train_household_max <- aggregate(cbind(Orden) ~ id, data = train_personas, FUN = max)
 
@@ -107,7 +107,7 @@ train_household <- train_household %>% mutate(Ingtot = (Ingtot / Orden))
 n_distinct(test_personas$id)
 n_distinct(test_hogares$id)
 
-#TEST PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
+#TEST PERSONAS: Using the aggregate() function calculate aggregated household income using train_personas databases
 test_household_max <- aggregate(cbind(Orden) ~ id, data = test_personas, FUN = max)
 
 family_head_test <- test_personas %>%
@@ -246,11 +246,57 @@ sumtable(total_table_selected, out = "return")
 ##Convert to tibble to make it go faster
 total_table <- as.tibble(total_table)
 
+##Descriptives------------------------------------------------------------------
+names(total_table)
+descriptives<- total_table  %>% select(li, lp, p6020, p6040, p6210, ingtot, pobre, nper)
+
+descriptives$p6020 <- as.numeric(descriptives$p6020)
+descriptives$p6040 <- as.numeric(descriptives$p6040)
+descriptives$p6210 <- as.numeric(descriptives$p6210)
+descriptives$pobre <- as.numeric(descriptives$pobre)
+
+ggplot(descriptives, aes(x = p6210)) +
+  geom_bar(fill = "lightgreen") +
+  labs(title = "Bar Plot of Education Level", x = "Education Level", y = "Count")
+
+ggplot(descriptives, aes(x = p6040)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "white") +
+  labs(title = "Histogram of Age", x = "Age", y = "Frequency")
+
+ggplot(descriptives, aes(x = ingtot)) +
+  geom_density(fill = "pink", alpha = 0.5) +
+  labs(title = "Density Plot of Total Income", x = "Total Income")
+
+ggplot(descriptives, aes(x = ingtot)) +
+  geom_density(fill = "orange", alpha = 0.5) +
+  labs(title = "Density Plot of Poverty Line", x = "Poverty Line")
+
+library(reshape2)
+
+#Correlation
+cor_matrix <- cor(descriptives[, c("li", "lp", "p6020", "p6040", "p6210", "ingtot", "pobre", "nper")])
+glimpse(descriptives)
+# Melt the correlation matrix into a long format for ggplot2
+cor_melted <- melt(cor_matrix)
+
+# Create the correlation heatmap
+ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient(low = "lightblue", high = "blue") +
+  labs(title = "Correlation Heatmap", x = "", y = "") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+#Correlation #2 
+install.packages("corrplot")
+library(corrplot)
+corrplot(cor_matrix, method = "color")
+
+glimpse(total_table)
 ## Modelo 1 Logit --------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(li, lp, p6020, p6040, p5090, nper, p6210, depto, p5130, p5000, p5010, pobre, indigente, ingtot)  %>% na.omit()
 
-variables_numericas <- c("p6040", "p5130", "li", "lp", "ingtot")
+variables_numericas <- c("p5130", "li", "lp", "ingtot")
 escalador <- preProcess(train_data[, variables_numericas],
                         method = c("center", "scale"))
 
@@ -362,12 +408,11 @@ modelo7 <- train(
 modelo7_imp<-varImp(modelo7)
 modelo7_imp<-rownames_to_column(modelo7_imp$importance, var = "variable")
 
-ggplot(modelo7_imp,  aes(x=Overall, 
-                         y=reorder(variable, Overall)) +
+ggplot(modelo7_imp,  aes(x=Overall, y=reorder(variable, Overall)) +
          geom_col(fill = "darkblue")) 
 
 y_hat_insample7 <- predict(modelo7, train_data2)
-y_hat_outsample7 <- predict(moodelo7, test_data)
+y_hat_outsample7 <- predict(modelo7, test_data)
 
 #Accuracy
 acc_insample7 <- Accuraccy(y_pred = y_hat_insample7,
