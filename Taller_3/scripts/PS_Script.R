@@ -47,9 +47,13 @@ p_load(stringi, #manipulate string/text data in the cleaning process
        robustbase,
        caret, #classification and regression training package
 <<<<<<< HEAD
+<<<<<<< HEAD
        vtable, #output a descriptive variable table while working with data
        adabag, #For adaboost
        rpart.plot #To visualize trees
+=======
+       vtable #output a descriptive variable table while working with data
+>>>>>>> parent of d6f0c74 (ada boost)
 =======
        vtable #output a descriptive variable table while working with data
 >>>>>>> parent of d6f0c74 (ada boost)
@@ -565,7 +569,7 @@ Recall(y_pred = pobre_outsample,
 
 ## Modelo 3 Ada Boost ----------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
-train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
 
 train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                      pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
@@ -581,6 +585,7 @@ train_data$indigente <- ifelse(train_data$li > train_data$ingtot, 1, 0)
 #Logit regression
 set.seed(123)
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 ctrl<- trainControl(method = "cv",
                     number = 5,
@@ -609,11 +614,20 @@ logit <- train(
   method = "glmnet",
   preProcess = NULL
 >>>>>>> parent of d6f0c74 (ada boost)
+=======
+#Train the model with logit regression
+logit <- train(
+  ingtot ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "glmnet",
+  preProcess = NULL
+>>>>>>> parent of d6f0c74 (ada boost)
 )
 
 #Construct the test data frame
 test_data <- total_table  %>% filter(sample=="test")  
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                    pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
@@ -638,6 +652,15 @@ head(test_data %>% select(id,ingtot))
 
 >>>>>>> parent of d6f0c74 (ada boost)
 
+=======
+#Predict total income with logit
+test_data$ingtot <- predict(logit, test_data)
+
+head(test_data %>% select(id,ingtot))
+#test_data$ingtot <- round(test_data$ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
+
+
+>>>>>>> parent of d6f0c74 (ada boost)
 #Construct the dummy variables pobre & indigente
 test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
 
@@ -648,6 +671,9 @@ test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 submit<-predictTest_ada  %>% select(id,pobre)
 =======
 submit<-test_data  %>% select(id,pobre)
+<<<<<<< HEAD
+>>>>>>> parent of d6f0c74 (ada boost)
+=======
 >>>>>>> parent of d6f0c74 (ada boost)
 write.csv(submit,"Modelo3.csv",row.names=FALSE)
 
