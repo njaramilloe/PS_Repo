@@ -247,14 +247,8 @@ names(total_table)
 descriptives<- total_table  %>% select(li, lp, p6020, p6040, p6210, ingtot, pobre, nper)
 
 descriptives$p6020 <- as.numeric(descriptives$p6020)
-
-# Convert the integer column 'p6040' to numeric
 descriptives$p6040 <- as.numeric(descriptives$p6040)
-
-# Convert the factor column 'p6210' to numeric (you may need to provide appropriate coding)
 descriptives$p6210 <- as.numeric(descriptives$p6210)
-
-# Convert the factor column 'pobre' to numeric (you may need to provide appropriate coding)
 descriptives$pobre <- as.numeric(descriptives$pobre)
 
 ggplot(descriptives, aes(x = p6210)) +
@@ -272,7 +266,9 @@ ggplot(descriptives, aes(x = ingtot)) +
 ggplot(descriptives, aes(x = ingtot)) +
   geom_density(fill = "orange", alpha = 0.5) +
   labs(title = "Density Plot of Poverty Line", x = "Poverty Line")
+
 library(reshape2)
+
 #Correlation
 cor_matrix <- cor(descriptives[, c("li", "lp", "p6020", "p6040", "p6210", "ingtot", "pobre", "nper")])
 glimpse(descriptives)
@@ -286,6 +282,7 @@ ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
   labs(title = "Correlation Heatmap", x = "", y = "") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+#Correlation #2 
 install.packages("corrplot")
 library(corrplot)
 corrplot(cor_matrix, method = "color")
