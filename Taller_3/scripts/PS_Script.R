@@ -358,12 +358,11 @@ modelo7 <- train(
 modelo7_imp<-varImp(modelo7)
 modelo7_imp<-rownames_to_column(modelo7_imp$importance, var = "variable")
 
-ggplot(modelo7_imp,  aes(x=Overall, 
-                         y=reorder(variable, Overall)) +
+ggplot(modelo7_imp,  aes(x=Overall, y=reorder(variable, Overall)) +
          geom_col(fill = "darkblue")) 
 
 y_hat_insample7 <- predict(modelo7, train_data2)
-y_hat_outsample7 <- predict(moodelo7, test_data)
+y_hat_outsample7 <- predict(modelo7, test_data)
 
 #Accuracy
 acc_insample7 <- Accuraccy(y_pred = y_hat_insample7,
