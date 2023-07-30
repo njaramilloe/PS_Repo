@@ -208,6 +208,11 @@ write.csv(submit,"Modelo1.csv",row.names=FALSE)
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
 
+train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                     pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                     indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+
 # Calculate the percentage of zeros in the ingtot column
 percentage_zeros <- 100 * mean(train_data$ingtot == 0, na.rm = TRUE)
 print(percentage_zeros) # <1% are zeros. We will drop those observations
@@ -223,6 +228,9 @@ ctrl<- trainControl(method = "cv",
                     classProbs = TRUE,
                     verbose=FALSE,
                     savePredictions = T)
+
+# Check the class levels of 'pobre' variable
+class_levels <- unique(train_data$pobre)
 
 #Train the model with ada boost
   ada_boost1 <- train(
