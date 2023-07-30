@@ -79,7 +79,7 @@ test_personas <- read.csv("test_personas.csv")
 n_distinct(train_personas$id)
 n_distinct(train_hogares$id)
 
-#TRAIN PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
+#TRAIN PERSONAS: Using the aggregate() function calculate aggregated household income using train_personas databases
 train_household_sum <- aggregate(cbind(Ingtot) ~ id, data = train_personas, FUN = sum)
 train_household_max <- aggregate(cbind(Orden) ~ id, data = train_personas, FUN = max)
 
@@ -103,7 +103,7 @@ train_household <- train_household %>% mutate(Ingtot = (Ingtot / Orden))
 n_distinct(test_personas$id)
 n_distinct(test_hogares$id)
 
-#TEST PERSONAS: Using the aggregate() function alculate aggregated household income using train_personas databases
+#TEST PERSONAS: Using the aggregate() function calculate aggregated household income using train_personas databases
 test_household_max <- aggregate(cbind(Orden) ~ id, data = test_personas, FUN = max)
 
 family_head_test <- test_personas %>%
