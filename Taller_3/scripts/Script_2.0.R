@@ -164,7 +164,7 @@ variable_levels <- sapply(total_table, function(x) length(unique(x)))
 variable_levels
 #Vtable statistics
 total_table_selected<- total_table %>% select(li, lp, p6020, p6040, pobre, indigente, ingtot)
-sumtable(total_table_selected, out = "return")
+sum<-sumtable(total_table_selected, out = "return")
 #export to latex
 sum <- xtable(sum)
 # Export the table to a LaTeX file
@@ -218,6 +218,12 @@ colSums(is.na(train_data))/nrow(train_data)*100
 #Ada Boost
 set.seed(123)
 
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    verbose=FALSE,
+                    savePredictions = T)
+
 #Train the model with ada boost
   ada_boost1 <- train(
     pobre ~ p6020 + p6040 + (p6040*p6040),
@@ -255,7 +261,7 @@ set.seed(123)
   
   
   
-  ## Modelo 2 Spatial Block Cost Complexity Prunning - Bagging -------------------
+## Modelo 2 Spatial Block Cost Complexity Prunning - Bagging -------------------
   fitControl <- trainControl(method = "cv",
                              number = 10)
   #Train the model with ingtot
