@@ -242,11 +242,60 @@ sumtable(total_table_selected, out = "return")
 ##Convert to tibble to make it go faster
 total_table <- as.tibble(total_table)
 
+##Descriptives------------------------------------------------------------------
+names(total_table)
+descriptives<- total_table  %>% select(li, lp, p6020, p6040, p6210, ingtot, pobre, nper)
+
+descriptives$p6020 <- as.numeric(descriptives$p6020)
+
+# Convert the integer column 'p6040' to numeric
+descriptives$p6040 <- as.numeric(descriptives$p6040)
+
+# Convert the factor column 'p6210' to numeric (you may need to provide appropriate coding)
+descriptives$p6210 <- as.numeric(descriptives$p6210)
+
+# Convert the factor column 'pobre' to numeric (you may need to provide appropriate coding)
+descriptives$pobre <- as.numeric(descriptives$pobre)
+
+ggplot(descriptives, aes(x = p6210)) +
+  geom_bar(fill = "lightgreen") +
+  labs(title = "Bar Plot of Education Level", x = "Education Level", y = "Count")
+
+ggplot(descriptives, aes(x = p6040)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "white") +
+  labs(title = "Histogram of Age", x = "Age", y = "Frequency")
+
+ggplot(descriptives, aes(x = ingtot)) +
+  geom_density(fill = "pink", alpha = 0.5) +
+  labs(title = "Density Plot of Total Income", x = "Total Income")
+
+ggplot(descriptives, aes(x = ingtot)) +
+  geom_density(fill = "orange", alpha = 0.5) +
+  labs(title = "Density Plot of Poverty Line", x = "Poverty Line")
+library(reshape2)
+#Correlation
+cor_matrix <- cor(descriptives[, c("li", "lp", "p6020", "p6040", "p6210", "ingtot", "pobre", "nper")])
+glimpse(descriptives)
+# Melt the correlation matrix into a long format for ggplot2
+cor_melted <- melt(cor_matrix)
+
+# Create the correlation heatmap
+ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient(low = "lightblue", high = "blue") +
+  labs(title = "Correlation Heatmap", x = "", y = "") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+install.packages("corrplot")
+library(corrplot)
+corrplot(cor_matrix, method = "color")
+
+glimpse(total_table)
 ## Modelo 1 Logit --------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(li, lp, p6020, p6040, p5090, nper, p6210, depto, p5130, p5000, p5010, pobre, indigente, ingtot)  %>% na.omit()
 
-variables_numericas <- c("p6040", "p5130", "li", "lp", "ingtot")
+variables_numericas <- c("p5130", "li", "lp", "ingtot")
 escalador <- preProcess(train_data[, variables_numericas],
                         method = c("center", "scale"))
 
