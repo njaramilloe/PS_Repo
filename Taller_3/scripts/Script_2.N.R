@@ -301,14 +301,13 @@ head(test_data  %>% select(id,prob_hat))
 
 #Classification
 rule <- 1/2 # Bayes Rule
-test_data <-  test_data  %>% mutate(pobre_hat=ifelse(prob_hat>rule,1,0))    ## predicted class labels
+test_data <-  test_data  %>% mutate(pobre=ifelse(prob_hat>rule,1,0))    ## predicted class labels
 
-head(test_data  %>% select(id,prob_hat,pobre_hat))
+head(test_data  %>% select(id,prob_hat,pobre))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-test_data  %>% select(id,pobre_hat)
-submit <- submit  %>% rename(pobre_hat=pobre)
-write.csv(submit,"Modelo1.csv",row.names=FALSE)
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Modelo2.csv",row.names=FALSE)
 
 #Probabilities to calculate AUC
 probs_insample <- predict(logit, train_data, type="prob")[, "Si", drop = T] #Nos interesa los que son pobres
@@ -318,21 +317,12 @@ probs_outsample <- predict(logit, test_data, type="prob")[, "Si", drop = T] #Nos
 acc_insample <- Accuracy(y_pred = pobre_insample,       #Accuracy fuera de muestra 0.7998
                          y_true = train_data$pobre)
 
-acc_outsample <- Accuracy(y_pred = pobre_outsample,     #Accueracy dentro de muestra NA
-                          y_true = test_data$pobre)
-
 #Precision
 Precision(y_pred = pobre_insample, 
           y_true = as.factor(train_data$pobre),
           positive = "Si")      #NaN
 
-Precision(y_pred = pobre_outsample, 
-          y_true = as.factor(test_data$pobre),
-          positive = "Si")      #NaN
-
-
 ## Modelo 3 Ada Boost ----------------------------------------------------------
-
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
 
@@ -361,7 +351,7 @@ ctrl<- trainControl(method = "cv",
 class_levels <- unique(train_data$pobre)
 
 #Train the model with ada boost
-  ada_boost1 <- train(
+ada_boost1 <- train(
     pobre ~ p6020 + p6040 + (p6040*p6040),
     data = train_data,
     method = "AdaBoost.M1",
