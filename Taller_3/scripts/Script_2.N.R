@@ -447,8 +447,67 @@ train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p602
 train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                        pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
                                        indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
-  
-  
+
+# Calculate the percentage of zeros in the ingtot column
+percentage_zeros <- 100 * mean(train_data$ingtot == 0, na.rm = TRUE)
+print(percentage_zeros) # <1% are zeros. We will drop those observations
+
+#Drop zeros in ingtot
+train_data <- subset(train_data, ingtot != 0)
+colSums(is.na(train_data))/nrow(train_data)*100 
+
+set.seed(123)
+
+fitControl <- trainControl(method = "cv",
+                           number = 10)
+
+#Train the model with Log(price)
+tree_ranger <- train(
+  ingtot ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "ranger",
+  trControl = fitControl,
+  metric = "MAE",
+  tuneGrid = expand.grid(
+    mtry = c(1,2,3),  #número de predictores que va a sacar aleatoriamente. En este caso en cada bootstrap saca 1 predictor de la regresión
+    splitrule = "variance", #Regla de partición
+    min.node.size = c(5,10,15)) #Cantidad de observaciones en el nodo. Default 5 para regresiones
+)
+
+tree_ranger
+tree_ranger$bestTune
+
+#Construct the test data frame
+test_data<-total_table  %>% filter(sample=="test")  
+test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                     pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                     indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+#Predict the tree with test data
+test_data$ingtot<-predict(tree_ranger,test_data)
+head(test_data %>% select(id,ingtot))
+
+#Construct the dummy variables pobre & indigente
+test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
+test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
+
+#Accuracy
+train_data <- train_data  %>% mutate(pobre=factor(pobre,levels=c(0,1),labels=c("0","1")))
+test_data <- test_data  %>% mutate(pobre=factor(pobre,levels=c(0,1),labels=c("0","1")))
+accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0.8048935
+                              y_true = train_data$pobre)
+
+length(test_data$pobre)
+length(train_data$pobre)
+
+sum(is.na(test_data$pobre))
+sum(is.na(train_data$pobre))
+
+class(test_data$pobre)
+class(train_data$pobre)
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Tree_v5.csv",row.names=FALSE)
 ## Modelo 6 Ada Boost ----------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
