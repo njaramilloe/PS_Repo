@@ -508,6 +508,7 @@ class(train_data$pobre)
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
 write.csv(submit,"Tree_v5.csv",row.names=FALSE)
+
 ## Modelo 6 Ada Boost ----------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
@@ -568,8 +569,6 @@ head(test_data %>% select(id,pred_ada,pobre,indigente)
 submit<-test_data  %>% select(id,pobre)
 write.csv(submit,"Modelo6.csv",row.names=FALSE)
        
-       
-       
 #Modelo 7: Bosque 1 -------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
@@ -626,9 +625,6 @@ accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0.7998109
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
 write.csv(submit,"Tree_v7.csv",row.names=FALSE)
-
-       
-
 
 ##Modelo 8: Árbol continua -------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
