@@ -373,11 +373,18 @@ test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("
 
 test_data$pobre<-predict(ada_boost1,test_data)
 
+test_data <- test_data %>% mutate(pobre = factor(pobre,levels=c("No","Si"),labels=c("0","1")))
+train_data <- train_data %>% mutate(pobre = factor(pobre,levels=c("No","Si"),labels=c("0","1")))
+
 head(test_data %>% select(id,pobre))
+
+#Accuracy
+accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0.8048935
+                              y_true = train_data$pobre)
+
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")))
 write.csv(submit,"Modelo_v3.csv",row.names=FALSE)
   
   
@@ -418,9 +425,19 @@ test_data$pobre<-predict(class_arboles,test_data)
 
 head(test_data %>% select(id,pobre))
 
+test_data <- test_data %>% mutate(pobre = factor(pobre,levels=c("No","Si"),labels=c("0","1")))
+train_data <- train_data %>% mutate(pobre = factor(pobre,levels=c("No","Si"),labels=c("0","1")))
+
+head(test_data %>% select(id,pobre))
+head(train_data %>% select(id,pobre))
+
+
+#Accuracy
+accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0.7998109
+                              y_true = train_data$pobre)
+
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")))
 write.csv(submit,"Modelo_v4.csv",row.names=FALSE)
   
 
@@ -535,9 +552,20 @@ test_data$pobre<-predict(class_bosques,test_data)
 
 head(test_data %>% select(id,pobre))
 
+test_data <- test_data %>% mutate(pobre = factor(pobre,levels=c("No","Si"),labels=c("0","1")))
+train_data <- train_data %>% mutate(pobre = factor(pobre,levels=c("No","Si"),labels=c("0","1")))
+
+head(test_data %>% select(id,pobre))
+head(train_data %>% select(id,pobre))
+
+
+#Accuracy
+accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0.7998109
+                              y_true = train_data$pobre)
+
+
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("0","1"))
 write.csv(submit,"Tree_v7.csv",row.names=FALSE)
 
        
@@ -583,9 +611,92 @@ test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 
 head(test_data %>% select(id,pobre))
 
+#Accuracy
+accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0
+                              y_true = train_data$pobre)
+
+
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
 write.csv(submit,"Tree_v8.csv",row.names=FALSE)
 
+
+##Modelo 9: Árbol continua con más variables-------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables (total income, age, sex)
+train_data <- total_table  %>% filter(sample=="train")  %>% select(li, lp, p6020, p6040, p5090, nper, p6210, depto, p5130, p5000, p5010, pobre, indigente, ingtot)  %>% na.omit()
+test_data <- total_table %>% filter(sample=="test") %>% select(li, lp, p6020, p6040, p5090, nper, p6210, depto, p5130, p5000, p5010, pobre, indigente, ingtot)
+
+variables_numericas <- c("p6040", "p5130", "li", "lp", "ingtot")
+escalador <- preProcess(train_data[, variables_numericas],
+                        method = c("center", "scale"))
+
+train_data[, variables_numericas] <- predict(escalador, train_data[, variables_numericas])
+test_data[, variables_numericas] <- predict(escalador, test_data[, variables_numericas])
+
+train_data <- train_data  %>% mutate(p6020=factor(p6020,levels=c(0,1),labels=c("Woman","Man")))
+test_data <- test_data  %>% mutate(p6020=factor(p6020,levels=c(0,1),labels=c("Woman","Man")))
+
+# Calculate the percentage of zeros in the ingtot column
+percentage_zeros <- 100 * mean(train_data$ingtot == 0, na.rm = TRUE)
+print(percentage_zeros) # <1% are zeros. We will drop those observations
+
+#Drop zeros in ingtot
+train_data <- subset(train_data, ingtot != 0)
+colSums(is.na(train_data))/nrow(train_data)*100 
+
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    verbose=FALSE,
+                    savePredictions = T)
+
+set.seed(123)
+
+reg_arboles2 <- train(ingtot ~ p6020 + p6040 + I(p6040^2) + p5090 + p6210 + depto + p5130 + p5000 + p5010,
+                     data = train_data, 
+                     method = "rpart",
+                     trControl = ctrl,
+                     tuneLength=100)
+
+reg_arboles2
+
+reg_arboles2_imp<-varImp(reg_arboles2)
+reg_arboles2_imp<-rownames_to_column(reg_arboles2_imp$importance, var = "variable")
+
+ggplot(reg_arboles2_imp, aes(x = Overall, y = reorder(variable, Overall))) +
+  geom_col(fill = "darkblue")
+
+y_hat_insample2 <- predict(reg_arboles2, train_data)
+
+
+#Construct the test data frame
+test_data <- total_table  %>% filter(sample=="test")  
+
+test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                   pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                   indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+test_data <- test_data %>% mutate(p6020 = factor(p6020,levels=c("0","1"),labels=c("0","1")))
+train_data <- train_data %>% mutate(pobre = factor(pobre,levels=c("0","1"),labels=c("0","1")))
+
+head(test_data %>% select(id,pobre))
+head(train_data %>% select(id,pobre))
+
+test_data$ingtot<-predict(reg_arboles2,test_data)
+
+#Construct the dummy variables pobre & indigente
+test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
+test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
+
+head(test_data %>% select(id,pobre))
+
+#Accuracy
+accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0
+                              y_true = train_data$pobre)
+
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Tree_v8.csv",row.names=FALSE)
 
   
