@@ -171,6 +171,7 @@ sum <- xtable(sum)
 #print.xtable(sum, file = "/Users/nataliajaramillo/Documents/GitHub/PS_Repo/Taller_3/stores/sumtable.tex", floating = FALSE)
 ##Convert to tibble to make it go faster
 total_table <- as.tibble(total_table)
+
 ## Modelo 1 Logit --------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
@@ -498,5 +499,51 @@ predictTest_bosque <- data.frame(
 #Accuracy
 mean(predictTest_arbol$obs == predictTest_arbol$pred)
        
+
+
+##Modelo 7: Árbol continua -------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables (total income, age, sex)
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+
+train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                     pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                     indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+
+ctrl<- trainControl(method = "cv",
+                    number = 5,
+                    classProbs = TRUE,
+                    verbose=FALSE,
+                    savePredictions = T)
+
+set.seed(123)
+
+reg_arboles <- train(ingtot ~ p6020 + p6040 + (p6040*p6040),
+                       data = train_data, 
+                       method = "rpart",
+                       trControl = ctrl,
+                       tuneLength=100)
+
+reg_arboles
+
+#Construct the test data frame
+test_data <- total_table  %>% filter(sample=="test")  
+
+test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                   pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                   indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+test_data$ingtot<-predict(reg_arboles,test_data)
+
+#Construct the dummy variables pobre & indigente
+test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
+test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
+
+head(test_data %>% select(id,pobre))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Tree_v7.csv",row.names=FALSE)
+
 
   
