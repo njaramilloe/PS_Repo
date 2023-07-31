@@ -490,7 +490,7 @@ submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("0","1")
 write.csv(submit,"Tree_v7.csv",row.names=FALSE)
 
        
-accuracy(y_pred=test_data$pobre, y_true=train_data$pobre)
+acc_insample7<-Accuracy(y_pred=test_data$pobre, y_true=train_data$pobre)
 
 ##Modelo 8: Árbol continua -------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
