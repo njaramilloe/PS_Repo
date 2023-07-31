@@ -46,9 +46,17 @@ p_load(stringi, #manipulate string/text data in the cleaning process
        smotefamily, #detailed description of what the package does
        robustbase,
        caret, #classification and regression training package
+<<<<<<< HEAD
+<<<<<<< HEAD
        vtable, #output a descriptive variable table while working with data
        adabag, #For adaboost
        rpart.plot #To visualize trees
+=======
+       vtable #output a descriptive variable table while working with data
+>>>>>>> parent of d6f0c74 (ada boost)
+=======
+       vtable #output a descriptive variable table while working with data
+>>>>>>> parent of d6f0c74 (ada boost)
 )
 
 # set and register cores to parallel processing
@@ -247,14 +255,8 @@ names(total_table)
 descriptives<- total_table  %>% select(li, lp, p6020, p6040, p6210, ingtot, pobre, nper)
 
 descriptives$p6020 <- as.numeric(descriptives$p6020)
-
-# Convert the integer column 'p6040' to numeric
 descriptives$p6040 <- as.numeric(descriptives$p6040)
-
-# Convert the factor column 'p6210' to numeric (you may need to provide appropriate coding)
 descriptives$p6210 <- as.numeric(descriptives$p6210)
-
-# Convert the factor column 'pobre' to numeric (you may need to provide appropriate coding)
 descriptives$pobre <- as.numeric(descriptives$pobre)
 
 ggplot(descriptives, aes(x = p6210)) +
@@ -272,7 +274,9 @@ ggplot(descriptives, aes(x = ingtot)) +
 ggplot(descriptives, aes(x = ingtot)) +
   geom_density(fill = "orange", alpha = 0.5) +
   labs(title = "Density Plot of Poverty Line", x = "Poverty Line")
+
 library(reshape2)
+
 #Correlation
 cor_matrix <- cor(descriptives[, c("li", "lp", "p6020", "p6040", "p6210", "ingtot", "pobre", "nper")])
 glimpse(descriptives)
@@ -286,6 +290,7 @@ ggplot(cor_melted, aes(x = Var1, y = Var2, fill = value)) +
   labs(title = "Correlation Heatmap", x = "", y = "") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
+#Correlation #2 
 install.packages("corrplot")
 library(corrplot)
 corrplot(cor_matrix, method = "color")
@@ -488,7 +493,7 @@ write.csv(submit,"Modelo1.csv",row.names=FALSE)
 
 ## Modelo 2 Logit classification -----------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
-train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
 
 train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                      pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
@@ -564,16 +569,24 @@ Recall(y_pred = pobre_outsample,
 
 ## Modelo 3 Ada Boost ----------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
-train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id)  %>% na.omit()
 
 train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                      pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
                                      indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
 
 
-#Ada Boost
+#Construct the dummy variables pobre & indigente in train database
+train_data$pobre <- ifelse(train_data$lp > train_data$ingtot, 1, 0)
+
+train_data$indigente <- ifelse(train_data$li > train_data$ingtot, 1, 0)
+
+
+#Logit regression
 set.seed(123)
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 ctrl<- trainControl(method = "cv",
                     number = 5,
                     classProbs = TRUE,
@@ -593,13 +606,29 @@ ada_boost1 <- train(
     mfinal = c(50, 100, 150),   #VER PARAMETROS MAS GRANDES
     maxdepth = c(1, 2, 3),
     coeflearn = c('Breiman', 'Freund'))
+=======
+#Train the model with logit regression
+logit <- train(
+  ingtot ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "glmnet",
+  preProcess = NULL
+>>>>>>> parent of d6f0c74 (ada boost)
+=======
+#Train the model with logit regression
+logit <- train(
+  ingtot ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "glmnet",
+  preProcess = NULL
+>>>>>>> parent of d6f0c74 (ada boost)
 )
-
-ada_boost1
 
 #Construct the test data frame
 test_data <- total_table  %>% filter(sample=="test")  
 
+<<<<<<< HEAD
+<<<<<<< HEAD
 test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                    pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
                                    indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
@@ -614,10 +643,38 @@ head(predictTest_ada %>% select(id, pobre))
 
 #Accuracy
 mean(predictTest_ada$id == predictTest_ada$pobre)
+=======
+#Predict total income with logit
+test_data$ingtot <- predict(logit, test_data)
 
+head(test_data %>% select(id,ingtot))
+#test_data$ingtot <- round(test_data$ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
+
+>>>>>>> parent of d6f0c74 (ada boost)
+
+=======
+#Predict total income with logit
+test_data$ingtot <- predict(logit, test_data)
+
+head(test_data %>% select(id,ingtot))
+#test_data$ingtot <- round(test_data$ingtot, digits = -2)    #digits = -2 indicates rounding to the nearest 100 (10^2)
+
+
+>>>>>>> parent of d6f0c74 (ada boost)
+#Construct the dummy variables pobre & indigente
+test_data$pobre <- ifelse(test_data$lp > test_data$ingtot, 1, 0)
+
+test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+<<<<<<< HEAD
 submit<-predictTest_ada  %>% select(id,pobre)
+=======
+submit<-test_data  %>% select(id,pobre)
+<<<<<<< HEAD
+>>>>>>> parent of d6f0c74 (ada boost)
+=======
+>>>>>>> parent of d6f0c74 (ada boost)
 write.csv(submit,"Modelo3.csv",row.names=FALSE)
 
 
