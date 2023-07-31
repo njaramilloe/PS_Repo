@@ -202,8 +202,74 @@ test_data$indigente <- ifelse(test_data$li > test_data$ingtot, 1, 0)
 submit<-test_data  %>% select(id,pobre)
 write.csv(submit,"Modelo1.csv",row.names=FALSE)
 
+## Modelo 2 Logit classification -----------------------------------------------
+#Divide the total data to keep only the wanted training data variables (total income, age, sex)
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
 
-## Modelo 2 Ada Boost ----------------------------------------------------------
+train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                     pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                     indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+#Logit regression
+set.seed(123)
+
+#Train the model with logit regression
+logit <- train(
+  pobre ~ p6020 + p6040 + (p6040*p6040),
+  data = train_data,
+  method = "glmnet",
+  preProcess = NULL
+)
+
+#Construct the test data frame
+test_data <- total_table  %>% filter(sample=="test") 
+
+test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                   pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                   indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+
+#Predict total income with logit
+pobre_insample <- predict(logit, train_data)
+pobre_outsample <- predict(logit, test_data)
+
+#For submission in kaggle
+test_data<- test_data  %>% mutate(prob_hat=predict(logit,newdata = test_data, type = "prob")) #type = "prob" gives the predicted probabilities.
+head(test_data  %>% select(id,prob_hat))
+
+#Classification
+rule <- 1/2 # Bayes Rule
+test_data <-  test_data  %>% mutate(pobre_hat=ifelse(prob_hat>rule,1,0))    ## predicted class labels
+
+head(test_data  %>% select(id,prob_hat,pobre_hat))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre_hat)
+submit <- submit  %>% rename(pobre_hat=pobre)
+write.csv(submit,"Modelo1.csv",row.names=FALSE)
+
+#Probabilities to calculate AUC
+probs_insample <- predict(logit, train_data, type="prob")[, "Si", drop = T] #Nos interesa los que son pobres
+probs_outsample <- predict(logit, test_data, type="prob")[, "Si", drop = T] #Nos interesa los que son pobres
+
+#Accuracy
+acc_insample <- Accuracy(y_pred = pobre_insample,       #Accuracy fuera de muestra 0.7998
+                         y_true = train_data$pobre)
+
+acc_outsample <- Accuracy(y_pred = pobre_outsample,     #Accueracy dentro de muestra NA
+                          y_true = test_data$pobre)
+
+#Precision
+Precision(y_pred = pobre_insample, 
+          y_true = as.factor(train_data$pobre),
+          positive = "Si")      #NaN
+
+Precision(y_pred = pobre_outsample, 
+          y_true = as.factor(test_data$pobre),
+          positive = "Si")      #NaN
+
+
+## Modelo 3 Ada Boost ----------------------------------------------------------
 
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
@@ -267,6 +333,171 @@ class_levels <- unique(train_data$pobre)
   submit<-test_data  %>% select(id,pobre)
   write.csv(submit,"Modelo2.csv",row.names=FALSE)
   
+  
+  
+  ##Modelo 4: Árboles -------------------------------------------------------------
+  #Divide the total data to keep only the wanted training data variables (total income, age, sex)
+  train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+  
+  train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                       pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                       indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+  
+  
+  ctrl<- trainControl(method = "cv",
+                      number = 5,
+                      classProbs = TRUE,
+                      verbose=FALSE,
+                      savePredictions = T)
+  
+  set.seed(123)
+  
+  class_arboles <- train(pobre ~ p6020 + p6040 + (p6040*p6040),
+                         data = train_data, 
+                         method = "rpart",
+                         trControl = ctrl,
+                         tuneLength=100)
+  
+  class_arboles
+  
+  #Construct the test data frame
+  test_data <- total_table  %>% filter(sample=="test")  
+  
+  test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                     pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                     indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+  
+  predictTest_arbol <- data.frame(
+    id = test_data$id,                                              ## observed class labels
+    predict(class_arboles, newdata = test_data, type = "prob"),         ## predicted class probabilities
+    pobre = predict(class_arboles, newdata = test_data, type = "raw")    ## predicted class labels
+  )
+  
+  head(predictTest_arbol)
+  
+  #Accuracy
+  mean(predictTest_arbol$obs == predictTest_arbol$pred)
+  
+  #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+  submit<-predictTest_arbol  %>% select(id,pobre)
+  write.csv(submit,"Modelo4.csv",row.names=FALSE)
+  
+  ## Modelo 5 Spatial Block Cost Complexity Prunning - Bagging -------------------
+  train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+  
+  train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                       pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                       indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+  
+  
+  ## Modelo 6 Ada Boost ----------------------------------------------------------
+  #Divide the total data to keep only the wanted training data variables (total income, age, sex)
+  train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+  
+  train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                       pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                       indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+  
+  
+  #Ada Boost
+  set.seed(123)
+  
+  ctrl<- trainControl(method = "cv",
+                      number = 5,
+                      classProbs = TRUE,
+                      verbose=FALSE,
+                      savePredictions = T)
+  
+  # Check the class levels of 'pobre' variable
+  class_levels <- unique(train_data$pobre)
+  
+  #Train the model with ada boost
+  ada_boost2 <- train(
+    pobre ~ p6020 + p6040 + (p6040*p6040),
+    data = train_data,
+    method = "AdaBoost.M1",
+    trControl = ctrl,
+    tuneGrid  = expand.grid(
+      mfinal = c(50, 100, 150),   #VER PARAMETROS MAS GRANDES
+      maxdepth = c(1, 2, 3),
+      coeflearn = c('Breiman', 'Freund'))
+  )
+  
+  ada_boost2
+  
+  train_data$pred_ada<-predict(ada_boost2,train_data)
+  
+  #Construct the test data frame
+  test_data<-total_table  %>% filter(sample=="test") 
+  
+  test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                     pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                     indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+  
+  #Predict the tree with test data
+  test_data$ada_boost2<-predict(pred_ada,test_data)
+  
+  head(test_data %>% select(id,pred_ada))
+  
+  #Construct the dummy variables pobre & indigente
+  test_data$pobre <- ifelse(test_data$lp > test_data$pred_ada, 1, 0)
+  
+  test_data$indigente <- ifelse(test_data$li > test_data$pred_ada, 1, 0)
+  
+  head(test_data %>% select(id,pred_ada,pobre,indigente)
+       
+       #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+       submit<-test_data  %>% select(id,pobre)
+       write.csv(submit,"Modelo6.csv",row.names=FALSE)
+       
+       
+       
+       #Modelo 7: Bosque 1 -------------------------------------------------------------
+       #Divide the total data to keep only the wanted training data variables (total income, age, sex)
+       train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+       
+       train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                            pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                            indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+       
+       ctrl<- trainControl(method = "cv",
+                           number = 5,
+                           classProbs = TRUE,
+                           verbose=FALSE,
+                           savePredictions = T)
+       
+       
+       set.seed(123)
+       
+       class_bosques <- train(
+         pobre ~ p6020 + p6040 + (p6040*p6040),
+         data=train_data,
+         method = "ranger",
+         trControl = ctrl,
+         tuneGrid=expand.grid(
+           mtry = c(1,2,3,4,5,6,7,8),
+           splitrule = "gini",
+           min.node.size = c(15,30,45,60))
+       )
+       
+       class_bosques
+       
+       #Construct the test data frame
+       test_data <- total_table  %>% filter(sample=="test")  
+       
+       test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                          pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                          indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+       
+       predictTest_bosque <- data.frame(
+         obs = test_data$pobre,                                    ## observed class labels
+         predict(class_bosques, newdata = test_data, type = "prob"),         ## predicted class probabilities
+         pred = predict(class_bosques, newdata = test_data, type = "raw")    ## predicted class labels
+       )
+       
+       #Accuracy
+       mean(predictTest_arbol$obs == predictTest_arbol$pred)
+       
   
   
 ## Modelo 2 Spatial Block Cost Complexity Prunning - Bagging -------------------
