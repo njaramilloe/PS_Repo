@@ -444,32 +444,32 @@ test_data$pobre <- ifelse(test_data$lp > test_data$pred_ada, 1, 0)
   
 test_data$indigente <- ifelse(test_data$li > test_data$pred_ada, 1, 0)
   
-  head(test_data %>% select(id,pred_ada,pobre,indigente)
+head(test_data %>% select(id,pred_ada,pobre,indigente)
        
-       #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-       submit<-test_data  %>% select(id,pobre)
-       write.csv(submit,"Modelo6.csv",row.names=FALSE)
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+write.csv(submit,"Modelo6.csv",row.names=FALSE)
        
        
        
-       #Modelo 7: Bosque 1 -------------------------------------------------------------
-       #Divide the total data to keep only the wanted training data variables (total income, age, sex)
-       train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
+#Modelo 7: Bosque 1 -------------------------------------------------------------
+#Divide the total data to keep only the wanted training data variables (total income, age, sex)
+train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
        
-       train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+train_data <- train_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                             pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
                                             indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
        
-       ctrl<- trainControl(method = "cv",
+ctrl<- trainControl(method = "cv",
                            number = 5,
                            classProbs = TRUE,
                            verbose=FALSE,
                            savePredictions = T)
        
        
-       set.seed(123)
+set.seed(123)
        
-       class_bosques <- train(
+class_bosques <- train(
          pobre ~ p6020 + p6040 + (p6040*p6040),
          data=train_data,
          method = "ranger",
@@ -480,81 +480,23 @@ test_data$indigente <- ifelse(test_data$li > test_data$pred_ada, 1, 0)
            min.node.size = c(15,30,45,60))
        )
        
-       class_bosques
+class_bosques
        
-       #Construct the test data frame
-       test_data <- total_table  %>% filter(sample=="test")  
+#Construct the test data frame
+test_data <- total_table  %>% filter(sample=="test")  
        
-       test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
                                           pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
                                           indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
        
-       predictTest_bosque <- data.frame(
-         obs = test_data$pobre,                                    ## observed class labels
-         predict(class_bosques, newdata = test_data, type = "prob"),         ## predicted class probabilities
-         pred = predict(class_bosques, newdata = test_data, type = "raw")    ## predicted class labels
+predictTest_bosque <- data.frame(
+    obs = test_data$pobre,                                    ## observed class labels
+    predict(class_bosques, newdata = test_data, type = "prob"),         ## predicted class probabilities
+    pred = predict(class_bosques, newdata = test_data, type = "raw")    ## predicted class labels
        )
        
-       #Accuracy
-       mean(predictTest_arbol$obs == predictTest_arbol$pred)
+#Accuracy
+mean(predictTest_arbol$obs == predictTest_arbol$pred)
        
-  
-  
-## Modelo 2 Spatial Block Cost Complexity Prunning - Bagging -------------------
-  fitControl <- trainControl(method = "cv",
-                             number = 10)
-  #Train the model with ingtot
-  tree_ranger <- train(
-    ingtot ~ p6020 + p6040 + (p6040*p6040),
-    data = train_data,
-    method = "ranger",
-    trControl = fitControl,
-    metric = "MAE",
-    tuneGrid = expand.grid(
-      mtry = c(1,2,3),  #número de predictores que va a sacar aleatoriamente. En este caso en cada bootstrap saca 1 predictor de la regresión
-      splitrule = "variance", #Regla de partición
-      min.node.size = c(5,10,15)) #Cantidad de observaciones en el nodo. Default 5 para regresiones
-  )
-  tree_ranger
-  tree_ranger$bestTune
-  train_data$pred_tree<-predict(tree_ranger,train_data)
-  #Construct the test data frame
-  test_data<-total_table  %>% filter(sample=="test")  
-  #Predict the tree with test data
-  test_data$pred_tree<-predict(tree_ranger,test_data)
-  head(test_data %>% select(property_id,pred_tree))
-  #Drop the variable geometry and return Log(prices) into Price
-  test_data <- test_data   %>% st_drop_geometry()  %>% mutate(pred_tree=exp(pred_tree))
-  test_data$price <- round(test_data$pred_tree, digits = -7)    #Indicates rounding to the nearest 10.000.000 (10^7)
-  head(test_data  %>% select(property_id, pred_tree, price))
-  #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-  submit<-test_data  %>% select(property_id,price)
-  write.csv(submit,"Tree_v14.csv",row.names=FALSE)
-  #MAE and MAPE train 
-  MAE(train_data$pred_tree, train_data$price)
-  MAPE(train_data$pred_tree, train_data$price)
-  #MAE
-  MAE(test_data$pred_tree, test_data$price)
-  #MAE V14: 2.496.469
-  MAPE(test_data$pred_tree, test_data$price)
-  ### Model Comparison------------------------------------------------------------
-  # Create a dataframe with the model information
-  modelcomparison <- data.frame(
-    Model = c("Model 14", "Model 10", "Model 9", "Model 3Rounded"),
-    Method = c("Random Forest", "Elastic Net Regularization", "Recursive Partitioning and Regression Tree", "Recursive Partitioning and Regression Tree"),
-    Variables = c("15", "15", "14", "4"),
-    MAE = c("2.496.469", "2.496.152", "2.653.858", "3.176.430")
-  )
-  # Create the chart using ggplot2
-  table <- stargazer(modelcomparison, 
-                     title = "Model Comparison", 
-                     column.labels = c("Model", "Method", "Variables", "MAE"),
-                     label = "tab:model_comparison",
-                     align = TRUE,
-                     header = FALSE,
-                     summary = FALSE)
-  # Display the chart
-  cat(table, sep = "")
-  # stop the cores cluster on parallel processing
-  stopCluster(cl)
+
   
