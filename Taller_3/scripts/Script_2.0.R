@@ -315,24 +315,19 @@ ada_boost1
   
 #Construct the test data frame
 test_data <- total_table  %>% filter(sample=="test")  
-  
 
-#Predict poverty with ada boost
-predictTest_ada <- data.frame(
-  obs = test_data$pobre,
-  predict(ada_boost1, newdata = test_data,  type = "prob"),
-  pred = predict(ada_boost1, newdata = test_data, type = "raw"))
-  
- 
+test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                   pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                   indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+test_data$pobre<-predict(ada_boost1,test_data)
+
 head(test_data %>% select(id,pobre))
-  
-#Accuracy
-mean(predictTest_ada$obs == predictTest_ada$pred)
 
-  
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-write.csv(submit,"Modelo3.csv",row.names=FALSE)
+submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")))
+write.csv(submit,"Modelo_v3.csv",row.names=FALSE)
   
   
   
@@ -363,26 +358,21 @@ class_arboles
   
 #Construct the test data frame
 test_data <- total_table  %>% filter(sample=="test")  
-  
-test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
-                                     pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
-                                     indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
 
-predictTest_arbol <- data.frame(
-  id = test_data$id,                                              ## observed class labels
-  predict(class_arboles, newdata = test_data, type = "prob"),         ## predicted class probabilities
-  pobre = predict(class_arboles, newdata = test_data, type = "raw")    ## predicted class labels
-  )
-  
-head(predictTest_arbol)
-  
-#Accuracy
-mean(predictTest_arbol$obs == predictTest_arbol$pred)
-  
+test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
+                                   pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                   indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+test_data$pobre<-predict(class_arboles,test_data)
+
+head(test_data %>% select(id,pobre))
+
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
-submit<-predictTest_arbol  %>% select(id,pobre)
-write.csv(submit,"Modelo4.csv",row.names=FALSE)
+submit<-test_data  %>% select(id,pobre)
+submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")))
+write.csv(submit,"Modelo_v4.csv",row.names=FALSE)
   
+
 ## Modelo 5 Spatial Block Cost Complexity Prunning - Bagging -------------------
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
   
@@ -482,26 +472,27 @@ class_bosques <- train(
        )
        
 class_bosques
-       
+
 #Construct the test data frame
 test_data <- total_table  %>% filter(sample=="test")  
-       
+
 test_data <- test_data  %>% mutate(p6020 = factor(p6020,levels=c(0,1),labels=c("Woman","Men")),
-                                          pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
-                                          indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
-       
-predictTest_bosque <- data.frame(
-    obs = test_data$pobre,                                    ## observed class labels
-    predict(class_bosques, newdata = test_data, type = "prob"),         ## predicted class probabilities
-    pred = predict(class_bosques, newdata = test_data, type = "raw")    ## predicted class labels
-       )
-       
-#Accuracy
-mean(predictTest_arbol$obs == predictTest_arbol$pred)
+                                   pobre = factor(pobre,levels=c(0,1),labels=c("No","Si")),
+                                   indigente = factor(indigente,levels=c(0,1),labels=c("No","Si")))
+
+test_data$pobre<-predict(class_bosques,test_data)
+
+head(test_data %>% select(id,pobre))
+
+#Create the submission document by selecting only the variables required and renaming them to adjust to instructions
+submit<-test_data  %>% select(id,pobre)
+submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("0","1"))
+write.csv(submit,"Tree_v7.csv",row.names=FALSE)
+
        
 
 
-##Modelo 7: Árbol continua -------------------------------------------------------------
+##Modelo 8: Árbol continua -------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
 train_data <- total_table  %>% filter(sample=="train")  %>% select(ingtot , p6020, p6040, id, pobre, indigente)  %>% na.omit()
 
@@ -543,7 +534,7 @@ head(test_data %>% select(id,pobre))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-write.csv(submit,"Tree_v7.csv",row.names=FALSE)
+write.csv(submit,"Tree_v8.csv",row.names=FALSE)
 
 
   
