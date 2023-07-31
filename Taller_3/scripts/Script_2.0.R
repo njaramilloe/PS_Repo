@@ -435,7 +435,7 @@ test_data$pobre <- ifelse(test_data$lp > test_data$pred_ada, 1, 0)
   
 test_data$indigente <- ifelse(test_data$li > test_data$pred_ada, 1, 0)
   
-head(test_data %>% select(id,pred_ada,pobre,indigente)
+head(test_data %>% select(id,pred_ada,pobre,indigente))
        
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
@@ -486,11 +486,11 @@ head(test_data %>% select(id,pobre))
 
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
-submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("0","1"))
+submit <- submit %>% mutate(pobre = factor(pobre,levels=c(0,1),labels=c("0","1")))
 write.csv(submit,"Tree_v7.csv",row.names=FALSE)
 
        
-
+accuracy(y_pred=test_data$pobre, y_true=train_data$pobre)
 
 ##Modelo 8: Árbol continua -------------------------------------------------------------
 #Divide the total data to keep only the wanted training data variables (total income, age, sex)
