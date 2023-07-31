@@ -480,6 +480,14 @@ test_data <- test_data  %>% mutate(pobre=factor(pobre,levels=c(0,1),labels=c("0"
 accuracy_insample <- Accuracy(y_pred = test_data$pobre,   ###accuracy 0.8048935
                               y_true = train_data$pobre)
 
+length(test_data$pobre)
+length(train_data$pobre)
+
+sum(is.na(test_data$pobre))
+sum(is.na(train_data$pobre))
+
+class(test_data$pobre)
+class(train_data$pobre)
 #Create the submission document by selecting only the variables required and renaming them to adjust to instructions
 submit<-test_data  %>% select(id,pobre)
 write.csv(submit,"Tree_v5.csv",row.names=FALSE)
